@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Env / secrets
+.env
+*.env
+!.env.example
+
+# Node
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# SQLite (local dev fallback DB)
+*.db
+
+# Stray temp files
+*.tmp
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Instruments cache (if persisted to disk later)
+*.json.gz

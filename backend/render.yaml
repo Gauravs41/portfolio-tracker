@@ -1,0 +1,19 @@
+# Render deployment config for the FastAPI backend.
+# Set UPSTOX_TOKEN and DATABASE_URL as secret env vars in the Render dashboard.
+services:
+  - type: web
+    name: portfolio-tracker-api
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: UPSTOX_TOKEN
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: QUOTE_CACHE_TTL
+        value: "60"

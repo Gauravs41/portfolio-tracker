@@ -1,0 +1,11 @@
+# Python deps for FastAPI backend.
+# Version floors chosen so pip resolves wheels that support Python 3.14.
+# pg8000 is a pure-Python Postgres driver (no compilation needed on new Pythons).
+fastapi>=0.115.0
+uvicorn[standard]>=0.34.0
+httpx>=0.28.0
+sqlalchemy>=2.0.36
+pg8000>=1.31.2
+pydantic>=2.10.0
+pydantic-settings>=2.7.0
+python-dotenv>=1.0.1
