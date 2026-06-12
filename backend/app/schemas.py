@@ -11,7 +11,7 @@ class InstrumentOut(BaseModel):
     name: str
     exchange: str
     segment: str
-    series: str = ""
+    instrument_type: str = ""
     board_type: str = "MAINBOARD"
 
 

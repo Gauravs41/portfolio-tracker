@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS instrument_meta (
     name            VARCHAR(255) DEFAULT '',
     exchange        VARCHAR(16) DEFAULT '',
     segment         VARCHAR(32) DEFAULT '',
-    series          VARCHAR(16) DEFAULT '',
+    instrument_type VARCHAR(16) DEFAULT '',
     board_type      VARCHAR(16) DEFAULT 'MAINBOARD',
     sector          VARCHAR(120)
 );

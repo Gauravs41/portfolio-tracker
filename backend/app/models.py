@@ -69,7 +69,7 @@ class InstrumentMeta(Base):
     name: Mapped[str] = mapped_column(String(255), default="")
     exchange: Mapped[str] = mapped_column(String(16), default="")
     segment: Mapped[str] = mapped_column(String(32), default="")
-    series: Mapped[str] = mapped_column(String(16), default="")
+    instrument_type: Mapped[str] = mapped_column(String(16), default="")
     board_type: Mapped[str] = mapped_column(String(16), default="MAINBOARD")  # SME | MAINBOARD
     sector: Mapped[str | None] = mapped_column(String(120), nullable=True)
 

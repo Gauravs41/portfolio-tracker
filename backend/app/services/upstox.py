@@ -25,8 +25,20 @@ API_BASE = "https://api.upstox.com/v2"
 INSTRUMENTS_NSE_URL = "https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz"
 INSTRUMENTS_BSE_URL = "https://assets.upstox.com/market-quote/instruments/exchange/BSE.json.gz"
 
-# NSE/BSE SME series identifiers used to classify board type.
-SME_SERIES = {"SM", "ST", "MT", "MS"}
+# Upstox/Cloudflare blocks non-browser User-Agents (HTTP 403, error 1010
+# "browser_signature_banned"). Send a normal browser UA on every request.
+BROWSER_UA = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+)
+
+# Equity instrument_type codes per exchange (the master has no `series` field).
+# These exclude bonds/SDLs/govt securities that also live in the *_EQ segments.
+NSE_EQUITY_TYPES = {"EQ", "BE", "SM", "ST"}
+BSE_EQUITY_TYPES = {"A", "B", "T", "X", "XT", "Z", "M", "MT", "MS", "TS"}
+
+# SME-board instrument_type codes (NSE: SM/ST, BSE: M/MT/MS/TS).
+SME_TYPES = {"SM", "ST", "M", "MT", "MS", "TS"}
 
 
 class UpstoxError(RuntimeError):
@@ -48,13 +60,15 @@ def _headers() -> dict[str, str]:
     token = get_settings().upstox_token
     if not token:
         raise UpstoxError("UPSTOX_TOKEN is not configured")
-    return {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+    return {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json",
+        "User-Agent": BROWSER_UA,
+    }
 
 
-def _classify_board(series: str, segment: str) -> str:
-    if series and series.upper() in SME_SERIES:
-        return "SME"
-    if "SME" in (segment or "").upper():
+def _classify_board(instrument_type: str) -> str:
+    if (instrument_type or "").upper() in SME_TYPES:
         return "SME"
     return "MAINBOARD"
 
@@ -71,26 +85,34 @@ def load_instruments(force: bool = False) -> list[dict]:
 
     instruments: list[dict] = []
     try:
-        with httpx.Client(timeout=60) as client:
+        with httpx.Client(timeout=60, headers={"User-Agent": BROWSER_UA}) as client:
             for url in (INSTRUMENTS_NSE_URL, INSTRUMENTS_BSE_URL):
                 resp = client.get(url)
                 resp.raise_for_status()
                 raw = gzip.decompress(resp.content)
                 data = json.loads(raw)
                 for row in data:
-                    if row.get("instrument_type") not in (None, "EQ", "EQUITY"):
-                        # keep equities only for Phase 1
-                        if row.get("segment", "").endswith("_EQ") is False:
+                    segment = row.get("segment", "")
+                    itype = (row.get("instrument_type") or "").upper()
+                    # Keep only tradeable equities; *_EQ segments also hold
+                    # bonds/SDLs/govt secs which we exclude via instrument_type.
+                    if segment == "NSE_EQ":
+                        if itype not in NSE_EQUITY_TYPES:
                             continue
+                    elif segment == "BSE_EQ":
+                        if itype not in BSE_EQUITY_TYPES:
+                            continue
+                    else:
+                        continue
                     instruments.append(
                         {
                             "instrument_key": row.get("instrument_key", ""),
                             "symbol": row.get("trading_symbol") or row.get("tradingsymbol") or "",
                             "name": row.get("name", ""),
                             "exchange": row.get("exchange", ""),
-                            "segment": row.get("segment", ""),
-                            "series": row.get("series", ""),
-                            "board_type": _classify_board(row.get("series", ""), row.get("segment", "")),
+                            "segment": segment,
+                            "instrument_type": itype,
+                            "board_type": _classify_board(itype),
                         }
                     )
     except (httpx.HTTPError, OSError, ValueError) as exc:  # pragma: no cover - network
