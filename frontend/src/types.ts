@@ -48,6 +48,7 @@ export interface PerformanceRow {
   rsi_14: number | null;
   sma_20: number | null;
   sma_50: number | null;
+  pe_ratio: number | null;
   trend: string;
   sentiment: string;
 }

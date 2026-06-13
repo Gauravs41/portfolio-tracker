@@ -20,6 +20,7 @@ export function PerformanceTable({ rows, onRemove }: Props) {
           <th>1W</th>
           <th>2W</th>
           <th>1M</th>
+          <th>P/E</th>
           <th>RSI</th>
           <th>Trend</th>
           <th>Sentiment</th>
@@ -39,6 +40,7 @@ export function PerformanceTable({ rows, onRemove }: Props) {
             <td><Pct value={r.change_1w} /></td>
             <td><Pct value={r.change_2w} /></td>
             <td><Pct value={r.change_1m} /></td>
+            <td><Num value={r.pe_ratio} /></td>
             <td><Num value={r.rsi_14} /></td>
             <td className="muted">{r.trend.replace("_", " ")}</td>
             <td><BullBearBadge sentiment={r.sentiment} /></td>

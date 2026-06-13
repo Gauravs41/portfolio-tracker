@@ -86,6 +86,7 @@ class PerformanceRow(BaseModel):
     rsi_14: float | None = None
     sma_20: float | None = None
     sma_50: float | None = None
+    pe_ratio: float | None = None
     trend: str = "neutral"  # above_sma50 | below_sma50 | neutral
     sentiment: str = "neutral"  # bullish | bearish | neutral
 

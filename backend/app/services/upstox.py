@@ -51,9 +51,13 @@ class _Cache:
     quotes: dict[str, tuple[float, dict]] = field(default_factory=dict)
     instruments: list[dict] | None = None
     instruments_loaded_at: float = 0.0
+    fundamentals: dict[str, tuple[float, dict]] = field(default_factory=dict)
 
 
 _cache = _Cache(ttl=get_settings().quote_cache_ttl)
+
+# Fundamentals (key ratios) change slowly; cache for several hours.
+FUNDAMENTALS_TTL = 6 * 3600
 
 
 def _headers() -> dict[str, str]:
@@ -211,3 +215,61 @@ def get_daily_candles(instrument_key: str, days: int = 45) -> list[list]:
         raise UpstoxError(f"Failed to fetch candles for {instrument_key}: {exc}") from exc
     # Upstox returns newest-first; normalize to oldest-first.
     return list(reversed(candles))
+
+
+# ---------------------------------------------------------------------------
+# Fundamentals (key ratios)
+# ---------------------------------------------------------------------------
+
+# Upstox key-ratio names -> our snake_case keys.
+_RATIO_NAMES = {
+    "P/E": "pe",
+    "P/B": "pb",
+    "ROE": "roe",
+    "ROCE": "roce",
+    "ROA": "roa",
+    "EV/EBITDA": "ev_ebitda",
+    "Quick Ratio": "quick_ratio",
+}
+
+
+def _parse_ratio(value) -> float | None:
+    if value is None:
+        return None
+    s = str(value).strip().replace("%", "").replace(",", "")
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
+def get_key_ratios(instrument_key: str) -> dict:
+    """Return {pe, pb, roe, ...} for one instrument from Upstox key-ratios.
+
+    The endpoint keys off the ISIN (the part after '|' in the instrument_key).
+    Cached for FUNDAMENTALS_TTL since fundamentals change slowly.
+    """
+    isin = instrument_key.split("|")[-1]
+    if not isin:
+        return {}
+
+    now = time.time()
+    cached = _cache.fundamentals.get(isin)
+    if cached and (now - cached[0]) < FUNDAMENTALS_TTL:
+        return cached[1]
+
+    try:
+        with httpx.Client(timeout=20) as client:
+            resp = client.get(f"{API_BASE}/fundamentals/{isin}/key-ratios", headers=_headers())
+            resp.raise_for_status()
+            data = resp.json().get("data", [])
+    except (httpx.HTTPError, ValueError) as exc:  # pragma: no cover - network
+        raise UpstoxError(f"Failed to fetch key ratios for {instrument_key}: {exc}") from exc
+
+    ratios: dict = {}
+    for row in data:
+        key = _RATIO_NAMES.get(row.get("name"))
+        if key:
+            ratios[key] = _parse_ratio(row.get("company_value"))
+    _cache.fundamentals[isin] = (now, ratios)
+    return ratios

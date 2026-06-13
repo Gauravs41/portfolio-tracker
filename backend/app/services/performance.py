@@ -77,11 +77,17 @@ def compute_metrics(instrument_key: str, last_price: float | None = None) -> dic
         "rsi_14": None,
         "sma_20": None,
         "sma_50": None,
+        "pe_ratio": None,
         "trend": "neutral",
         "sentiment": "neutral",
     }
     for key in WINDOWS:
         result[key] = None
+
+    try:
+        result["pe_ratio"] = upstox.get_key_ratios(instrument_key).get("pe")
+    except UpstoxError:
+        result["pe_ratio"] = None
 
     try:
         candles = upstox.get_daily_candles(instrument_key)
