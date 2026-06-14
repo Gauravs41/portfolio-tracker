@@ -4,7 +4,17 @@ export interface Instrument {
   name: string;
   exchange: string;
   segment: string;
-  series: string;
+  instrument_type: string;
+  board_type: string;
+}
+
+export interface InstrumentMeta {
+  instrument_key: string;
+  symbol: string;
+  name: string;
+  tags: string[];
+  notes: string;
+  sector: string | null;
   board_type: string;
 }
 
@@ -51,6 +61,8 @@ export interface PerformanceRow {
   pe_ratio: number | null;
   trend: string;
   sentiment: string;
+  tags: string[];
+  notes: string;
 }
 
 export interface HoldingPerformanceRow extends PerformanceRow {

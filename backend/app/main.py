@@ -9,6 +9,7 @@ from app.db import Base, engine
 from app.routers import (
     diversification,
     holdings,
+    instrument_meta,
     instruments,
     performance,
     watchlists,
@@ -35,6 +36,7 @@ app.add_middleware(
 )
 
 app.include_router(instruments.router)
+app.include_router(instrument_meta.router)
 app.include_router(watchlists.router)
 app.include_router(holdings.router)
 app.include_router(performance.router)

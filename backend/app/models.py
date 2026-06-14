@@ -6,6 +6,7 @@ Future-ready stubs: ai_insights, financials, notifications, alert_rules.
 from datetime import datetime
 
 from sqlalchemy import (
+    JSON,
     DateTime,
     Float,
     ForeignKey,
@@ -72,6 +73,8 @@ class InstrumentMeta(Base):
     instrument_type: Mapped[str] = mapped_column(String(16), default="")
     board_type: Mapped[str] = mapped_column(String(16), default="MAINBOARD")  # SME | MAINBOARD
     sector: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    notes: Mapped[str] = mapped_column(Text, default="")
 
 
 # ---------------------------------------------------------------------------

@@ -1,9 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { ColumnDef } from "@tanstack/react-table";
 import { api } from "../api/client";
 import { SymbolSearch } from "../components/SymbolSearch";
+import { DataTable } from "../components/DataTable";
+import { TagsCell } from "../components/TagsCell";
+import { NotesCell } from "../components/NotesCell";
 import { BullBearBadge } from "../components/BullBearBadge";
 import { Num, Pct } from "../components/format";
-import type { HoldingsPerformance, Instrument } from "../types";
+import type { HoldingPerformanceRow, HoldingsPerformance, Instrument } from "../types";
 
 const SECTORS = [
   "Energy", "Financials", "IT", "Healthcare", "Consumer", "Industrials",
@@ -61,6 +65,69 @@ export default function Holdings() {
     await load();
   }
 
+  const columns = useMemo<ColumnDef<HoldingPerformanceRow, any>[]>(() => [
+    { accessorKey: "symbol", header: "Symbol", meta: { label: "Symbol", filterVariant: "text" }, cell: (c) => <strong>{c.getValue()}</strong> },
+    { accessorKey: "quantity", header: "Qty", meta: { label: "Qty", filterVariant: "number" }, cell: (c) => <Num value={c.getValue()} /> },
+    { accessorKey: "avg_buy_price", header: "Avg", meta: { label: "Avg", filterVariant: "number" }, cell: (c) => <Num value={c.getValue()} prefix="₹" /> },
+    { accessorKey: "last_price", header: "LTP", meta: { label: "LTP", filterVariant: "number" }, cell: (c) => <Num value={c.getValue()} prefix="₹" /> },
+    { accessorKey: "market_value", header: "Value", meta: { label: "Value", filterVariant: "number" }, cell: (c) => <Num value={c.getValue()} prefix="₹" /> },
+    { accessorKey: "allocation_pct", header: "Alloc%", meta: { label: "Alloc%", filterVariant: "number" }, cell: (c) => <><Num value={c.getValue()} />%</> },
+    { accessorKey: "change_1d", header: "1D", meta: { label: "1D %", filterVariant: "number" }, cell: (c) => <Pct value={c.getValue()} /> },
+    { accessorKey: "pnl", header: "P&L", meta: { label: "P&L", filterVariant: "number" }, cell: (c) => <Num value={c.getValue()} prefix="₹" /> },
+    { accessorKey: "pnl_pct", header: "P&L%", meta: { label: "P&L%", filterVariant: "number" }, cell: (c) => <Pct value={c.getValue()} /> },
+    { accessorKey: "rsi_14", header: "RSI", meta: { label: "RSI", filterVariant: "number" }, cell: (c) => <Num value={c.getValue()} /> },
+    { accessorKey: "sentiment", header: "Sentiment", meta: { label: "Sentiment", filterVariant: "select" }, cell: (c) => <BullBearBadge sentiment={c.getValue()} /> },
+    {
+      accessorKey: "sector",
+      header: "Sector",
+      meta: { label: "Sector", filterVariant: "select" },
+      cell: (c) => (
+        <select
+          value={c.row.original.sector ?? "Other"}
+          onChange={(e) => updateSector(c.row.original.id, e.target.value)}
+        >
+          {SECTORS.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+      ),
+    },
+    {
+      id: "tags",
+      header: "Tags",
+      accessorFn: (r) => (r.tags ?? []).join(", "),
+      meta: { label: "Tags", filterVariant: "text" },
+      cell: (c) => (
+        <TagsCell
+          instrumentKey={c.row.original.instrument_key}
+          symbol={c.row.original.symbol}
+          name={c.row.original.name}
+          tags={c.row.original.tags ?? []}
+          onChange={load}
+        />
+      ),
+    },
+    {
+      accessorKey: "notes",
+      header: "Notes",
+      meta: { label: "Notes", filterVariant: "text" },
+      cell: (c) => (
+        <NotesCell
+          instrumentKey={c.row.original.instrument_key}
+          symbol={c.row.original.symbol}
+          name={c.row.original.name}
+          notes={c.row.original.notes ?? ""}
+          onChange={load}
+        />
+      ),
+    },
+    {
+      id: "actions",
+      header: "",
+      enableSorting: false,
+      meta: { label: "Remove", filterVariant: "none" },
+      cell: (c) => <button className="danger" onClick={() => remove(c.row.original.id)}>×</button>,
+    },
+  ], []);
+
   return (
     <div>
       <h2>Holdings</h2>
@@ -116,51 +183,7 @@ export default function Holdings() {
         {loading ? <p className="muted">Loading…</p> : !data || data.rows.length === 0 ? (
           <p className="muted">No holdings yet. Add one above.</p>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Symbol</th>
-                <th>Qty</th>
-                <th>Avg</th>
-                <th>LTP</th>
-                <th>Value</th>
-                <th>Alloc%</th>
-                <th>1D</th>
-                <th>P&L</th>
-                <th>P&L%</th>
-                <th>RSI</th>
-                <th>Sentiment</th>
-                <th>Sector</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.rows.map((r) => (
-                <tr key={r.id}>
-                  <td><strong>{r.symbol}</strong></td>
-                  <td><Num value={r.quantity} /></td>
-                  <td><Num value={r.avg_buy_price} prefix="₹" /></td>
-                  <td><Num value={r.last_price} prefix="₹" /></td>
-                  <td><Num value={r.market_value} prefix="₹" /></td>
-                  <td><Num value={r.allocation_pct} />%</td>
-                  <td><Pct value={r.change_1d} /></td>
-                  <td><Num value={r.pnl} prefix="₹" /></td>
-                  <td><Pct value={r.pnl_pct} /></td>
-                  <td><Num value={r.rsi_14} /></td>
-                  <td><BullBearBadge sentiment={r.sentiment} /></td>
-                  <td>
-                    <select
-                      value={r.sector ?? "Other"}
-                      onChange={(e) => updateSector(r.id, e.target.value)}
-                    >
-                      {SECTORS.map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </td>
-                  <td><button className="danger" onClick={() => remove(r.id)}>×</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable columns={columns} data={data.rows} tableId="holdings" />
         )}
       </div>
     </div>

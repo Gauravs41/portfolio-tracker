@@ -1,7 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { ColumnDef } from "@tanstack/react-table";
 import { api } from "../api/client";
 import { SymbolSearch } from "../components/SymbolSearch";
-import { PerformanceTable } from "../components/PerformanceTable";
+import { DataTable } from "../components/DataTable";
+import { TagsCell } from "../components/TagsCell";
+import { NotesCell } from "../components/NotesCell";
+import { BullBearBadge } from "../components/BullBearBadge";
+import { Num, Pct } from "../components/format";
 import type { Instrument, PerformanceRow, Watchlist } from "../types";
 
 export default function Watchlists() {
@@ -71,6 +76,68 @@ export default function Watchlists() {
     await loadWatchlists();
   }
 
+  const refresh = () => { if (activeId !== null) loadPerformance(activeId); };
+
+  const columns = useMemo<ColumnDef<PerformanceRow, any>[]>(() => [
+    {
+      accessorKey: "symbol",
+      header: "Symbol",
+      meta: { label: "Symbol", filterVariant: "text" },
+      cell: (c) => (
+        <div>
+          <strong>{c.row.original.symbol}</strong>
+          <div className="muted" style={{ fontSize: 12 }}>{c.row.original.name}</div>
+        </div>
+      ),
+    },
+    { accessorKey: "last_price", header: "LTP", meta: { label: "LTP", filterVariant: "number" }, cell: (c) => <Num value={c.getValue()} prefix="₹" /> },
+    { accessorKey: "change_1d", header: "1D", meta: { label: "1D %", filterVariant: "number" }, cell: (c) => <Pct value={c.getValue()} /> },
+    { accessorKey: "change_3d", header: "3D", meta: { label: "3D %", filterVariant: "number" }, cell: (c) => <Pct value={c.getValue()} /> },
+    { accessorKey: "change_1w", header: "1W", meta: { label: "1W %", filterVariant: "number" }, cell: (c) => <Pct value={c.getValue()} /> },
+    { accessorKey: "change_2w", header: "2W", meta: { label: "2W %", filterVariant: "number" }, cell: (c) => <Pct value={c.getValue()} /> },
+    { accessorKey: "change_1m", header: "1M", meta: { label: "1M %", filterVariant: "number" }, cell: (c) => <Pct value={c.getValue()} /> },
+    { accessorKey: "pe_ratio", header: "P/E", meta: { label: "P/E", filterVariant: "number" }, cell: (c) => <Num value={c.getValue()} /> },
+    { accessorKey: "rsi_14", header: "RSI", meta: { label: "RSI", filterVariant: "number" }, cell: (c) => <Num value={c.getValue()} /> },
+    { accessorKey: "trend", header: "Trend", meta: { label: "Trend", filterVariant: "select" }, cell: (c) => <span className="muted">{String(c.getValue() ?? "").replace("_", " ")}</span> },
+    { accessorKey: "sentiment", header: "Sentiment", meta: { label: "Sentiment", filterVariant: "select" }, cell: (c) => <BullBearBadge sentiment={c.getValue()} /> },
+    {
+      id: "tags",
+      header: "Tags",
+      accessorFn: (r) => (r.tags ?? []).join(", "),
+      meta: { label: "Tags", filterVariant: "text" },
+      cell: (c) => (
+        <TagsCell
+          instrumentKey={c.row.original.instrument_key}
+          symbol={c.row.original.symbol}
+          name={c.row.original.name}
+          tags={c.row.original.tags ?? []}
+          onChange={refresh}
+        />
+      ),
+    },
+    {
+      accessorKey: "notes",
+      header: "Notes",
+      meta: { label: "Notes", filterVariant: "text" },
+      cell: (c) => (
+        <NotesCell
+          instrumentKey={c.row.original.instrument_key}
+          symbol={c.row.original.symbol}
+          name={c.row.original.name}
+          notes={c.row.original.notes ?? ""}
+          onChange={refresh}
+        />
+      ),
+    },
+    {
+      id: "actions",
+      header: "",
+      enableSorting: false,
+      meta: { label: "Remove", filterVariant: "none" },
+      cell: (c) => <button className="danger" onClick={() => removeStock(c.row.original)}>Remove</button>,
+    },
+  ], [activeId, active]);
+
   return (
     <div>
       <h2>Watchlists</h2>
@@ -106,8 +173,10 @@ export default function Watchlists() {
               Delete watchlist
             </button>
           </div>
-          {loading ? <p className="muted">Loading…</p> : (
-            <PerformanceTable rows={rows} onRemove={removeStock} />
+          {loading ? <p className="muted">Loading…</p> : rows.length === 0 ? (
+            <p className="muted">No stocks yet.</p>
+          ) : (
+            <DataTable columns={columns} data={rows} tableId="watchlist" />
           )}
         </div>
       )}

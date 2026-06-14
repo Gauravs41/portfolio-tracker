@@ -121,3 +121,89 @@ input, select {
 .search-results div:hover { background: var(--panel); }
 .muted { color: var(--muted); }
 .error { color: var(--red); margin: 8px 0; }
+
+/* ---- DataTable: column menu, filters, sorting ---- */
+.col-menu-wrap { position: relative; }
+.col-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  z-index: 20;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+  min-width: 180px;
+}
+.col-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.col-menu-item:hover { background: var(--panel); }
+.col-menu-item input { width: auto; }
+
+.th-sortable { cursor: pointer; user-select: none; }
+tr.filter-row th { padding-top: 0; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.col-filter { width: 100%; min-width: 70px; padding: 4px 6px; font-size: 12px; }
+
+/* ---- Tags (chips) ---- */
+.chips { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; justify-content: flex-start; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(76,141,255,.15);
+  color: var(--accent);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.chip-x {
+  background: transparent;
+  border: none;
+  color: inherit;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.chip-add {
+  background: transparent;
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+.chip-input { width: 90px; padding: 2px 6px; font-size: 12px; }
+
+/* ---- Notes ---- */
+.notes-view {
+  cursor: pointer;
+  max-width: 200px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 13px;
+  text-align: left;
+}
+.notes-input {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 13px;
+  width: 200px;
+  min-height: 48px;
+  resize: vertical;
+  font-family: inherit;
+}

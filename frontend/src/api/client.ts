@@ -3,6 +3,7 @@ import type {
   Holding,
   HoldingsPerformance,
   Instrument,
+  InstrumentMeta,
   PerformanceRow,
   Watchlist,
   WatchlistItem,
@@ -27,6 +28,15 @@ export const api = {
   // instruments
   searchInstruments: (q: string) =>
     req<Instrument[]>(`/instruments/search?q=${encodeURIComponent(q)}`),
+
+  // instrument metadata (tags / notes, global per stock)
+  getInstrumentMeta: (key: string) =>
+    req<InstrumentMeta>(`/instrument-meta/${encodeURIComponent(key)}`),
+  updateInstrumentMeta: (key: string, payload: Partial<InstrumentMeta>) =>
+    req<InstrumentMeta>(`/instrument-meta/${encodeURIComponent(key)}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
 
   // watchlists
   listWatchlists: () => req<Watchlist[]>("/watchlists"),

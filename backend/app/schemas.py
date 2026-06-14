@@ -15,6 +15,26 @@ class InstrumentOut(BaseModel):
     board_type: str = "MAINBOARD"
 
 
+# ---- Instrument metadata (tags / notes / sector, global per stock) ----
+class InstrumentMetaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    instrument_key: str
+    symbol: str = ""
+    name: str = ""
+    tags: list[str] = []
+    notes: str = ""
+    sector: str | None = None
+    board_type: str = "MAINBOARD"
+
+
+class InstrumentMetaUpdate(BaseModel):
+    symbol: str | None = None
+    name: str | None = None
+    tags: list[str] | None = None
+    notes: str | None = None
+    sector: str | None = None
+
+
 # ---- Watchlists ----
 class WatchlistItemCreate(BaseModel):
     instrument_key: str
@@ -89,6 +109,8 @@ class PerformanceRow(BaseModel):
     pe_ratio: float | None = None
     trend: str = "neutral"  # above_sma50 | below_sma50 | neutral
     sentiment: str = "neutral"  # bullish | bearish | neutral
+    tags: list[str] = []
+    notes: str = ""
 
 
 class HoldingPerformanceRow(PerformanceRow):

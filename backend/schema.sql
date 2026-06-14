@@ -37,8 +37,14 @@ CREATE TABLE IF NOT EXISTS instrument_meta (
     segment         VARCHAR(32) DEFAULT '',
     instrument_type VARCHAR(16) DEFAULT '',
     board_type      VARCHAR(16) DEFAULT 'MAINBOARD',
-    sector          VARCHAR(120)
+    sector          VARCHAR(120),
+    tags            JSONB DEFAULT '[]'::jsonb,
+    notes           TEXT DEFAULT ''
 );
+
+-- Existing DBs created before tags/notes were added: run once.
+-- ALTER TABLE instrument_meta ADD COLUMN IF NOT EXISTS tags JSONB DEFAULT '[]'::jsonb;
+-- ALTER TABLE instrument_meta ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';
 
 -- ---------------------------------------------------------------------------
 -- Future-ready stub tables
