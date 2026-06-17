@@ -39,12 +39,21 @@ CREATE TABLE IF NOT EXISTS instrument_meta (
     board_type      VARCHAR(16) DEFAULT 'MAINBOARD',
     sector          VARCHAR(120),
     tags            JSONB DEFAULT '[]'::jsonb,
-    notes           TEXT DEFAULT ''
+    notes           TEXT DEFAULT '',
+    rev_growth_year       DOUBLE PRECISION,
+    rev_growth_quarter    DOUBLE PRECISION,
+    profit_growth_year    DOUBLE PRECISION,
+    profit_growth_quarter DOUBLE PRECISION
 );
 
 -- Existing DBs created before tags/notes were added: run once.
 -- ALTER TABLE instrument_meta ADD COLUMN IF NOT EXISTS tags JSONB DEFAULT '[]'::jsonb;
 -- ALTER TABLE instrument_meta ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';
+-- Existing DBs created before the manual growth fields were added: run once.
+-- ALTER TABLE instrument_meta ADD COLUMN IF NOT EXISTS rev_growth_year DOUBLE PRECISION;
+-- ALTER TABLE instrument_meta ADD COLUMN IF NOT EXISTS rev_growth_quarter DOUBLE PRECISION;
+-- ALTER TABLE instrument_meta ADD COLUMN IF NOT EXISTS profit_growth_year DOUBLE PRECISION;
+-- ALTER TABLE instrument_meta ADD COLUMN IF NOT EXISTS profit_growth_quarter DOUBLE PRECISION;
 
 -- ---------------------------------------------------------------------------
 -- Future-ready stub tables

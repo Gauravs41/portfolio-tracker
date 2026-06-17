@@ -75,6 +75,11 @@ class InstrumentMeta(Base):
     sector: Mapped[str | None] = mapped_column(String(120), nullable=True)
     tags: Mapped[list[str]] = mapped_column(JSON, default=list)
     notes: Mapped[str] = mapped_column(Text, default="")
+    # Manually-entered forward growth estimates (percent). Null = not set.
+    rev_growth_year: Mapped[float | None] = mapped_column(Float, nullable=True)
+    rev_growth_quarter: Mapped[float | None] = mapped_column(Float, nullable=True)
+    profit_growth_year: Mapped[float | None] = mapped_column(Float, nullable=True)
+    profit_growth_quarter: Mapped[float | None] = mapped_column(Float, nullable=True)
 
 
 # ---------------------------------------------------------------------------

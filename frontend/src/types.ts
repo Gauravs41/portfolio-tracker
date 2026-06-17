@@ -16,7 +16,19 @@ export interface InstrumentMeta {
   notes: string;
   sector: string | null;
   board_type: string;
+  rev_growth_year: number | null;
+  rev_growth_quarter: number | null;
+  profit_growth_year: number | null;
+  profit_growth_quarter: number | null;
 }
+
+export type RsiInterval = "day" | "week" | "month";
+
+export type GrowthField =
+  | "rev_growth_year"
+  | "rev_growth_quarter"
+  | "profit_growth_year"
+  | "profit_growth_quarter";
 
 export interface WatchlistItem {
   id: number;
@@ -56,6 +68,7 @@ export interface PerformanceRow {
   change_2w: number | null;
   change_1m: number | null;
   rsi_14: number | null;
+  rsi_interval: RsiInterval;
   sma_20: number | null;
   sma_50: number | null;
   pe_ratio: number | null;
@@ -63,6 +76,10 @@ export interface PerformanceRow {
   sentiment: string;
   tags: string[];
   notes: string;
+  rev_growth_year: number | null;
+  rev_growth_quarter: number | null;
+  profit_growth_year: number | null;
+  profit_growth_quarter: number | null;
 }
 
 export interface HoldingPerformanceRow extends PerformanceRow {

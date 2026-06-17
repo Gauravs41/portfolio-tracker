@@ -25,6 +25,10 @@ class InstrumentMetaOut(BaseModel):
     notes: str = ""
     sector: str | None = None
     board_type: str = "MAINBOARD"
+    rev_growth_year: float | None = None
+    rev_growth_quarter: float | None = None
+    profit_growth_year: float | None = None
+    profit_growth_quarter: float | None = None
 
 
 class InstrumentMetaUpdate(BaseModel):
@@ -33,6 +37,10 @@ class InstrumentMetaUpdate(BaseModel):
     tags: list[str] | None = None
     notes: str | None = None
     sector: str | None = None
+    rev_growth_year: float | None = None
+    rev_growth_quarter: float | None = None
+    profit_growth_year: float | None = None
+    profit_growth_quarter: float | None = None
 
 
 # ---- Watchlists ----
@@ -104,6 +112,7 @@ class PerformanceRow(BaseModel):
     change_2w: float | None = None
     change_1m: float | None = None
     rsi_14: float | None = None
+    rsi_interval: str = "day"  # day | week | month
     sma_20: float | None = None
     sma_50: float | None = None
     pe_ratio: float | None = None
@@ -111,6 +120,11 @@ class PerformanceRow(BaseModel):
     sentiment: str = "neutral"  # bullish | bearish | neutral
     tags: list[str] = []
     notes: str = ""
+    # Manually-entered forward growth estimates (percent).
+    rev_growth_year: float | None = None
+    rev_growth_quarter: float | None = None
+    profit_growth_year: float | None = None
+    profit_growth_quarter: float | None = None
 
 
 class HoldingPerformanceRow(PerformanceRow):

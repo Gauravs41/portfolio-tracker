@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -53,9 +53,10 @@ interface Props<T> {
   columns: ColumnDef<T, any>[];
   data: T[];
   tableId: string;
+  toolbar?: ReactNode; // optional left-aligned controls (e.g. RSI selector)
 }
 
-export function DataTable<T>({ columns, data, tableId }: Props<T>) {
+export function DataTable<T>({ columns, data, tableId, toolbar }: Props<T>) {
   const visKey = `dt:${tableId}:vis`;
   const filtKey = `dt:${tableId}:filt`;
   const sortKey = `dt:${tableId}:sort`;
@@ -113,26 +114,29 @@ export function DataTable<T>({ columns, data, tableId }: Props<T>) {
 
   return (
     <div>
-      <div className="row" style={{ justifyContent: "flex-end", marginBottom: 8 }}>
-        {hasFilters && (
-          <button className="ghost" onClick={() => setColumnFilters([])}>Clear filters</button>
-        )}
-        <div className="col-menu-wrap" ref={menuRef}>
-          <button className="ghost" onClick={() => setMenuOpen((o) => !o)}>Columns ▾</button>
-          {menuOpen && (
-            <div className="col-menu">
-              {table.getAllLeafColumns().map((col) => (
-                <label key={col.id} className="col-menu-item">
-                  <input
-                    type="checkbox"
-                    checked={col.getIsVisible()}
-                    onChange={col.getToggleVisibilityHandler()}
-                  />
-                  <span>{col.columnDef.meta?.label ?? col.id}</span>
-                </label>
-              ))}
-            </div>
+      <div className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
+        <div className="row" style={{ gap: 8 }}>{toolbar}</div>
+        <div className="row" style={{ gap: 8 }}>
+          {hasFilters && (
+            <button className="ghost" onClick={() => setColumnFilters([])}>Clear filters</button>
           )}
+          <div className="col-menu-wrap" ref={menuRef}>
+            <button className="ghost" onClick={() => setMenuOpen((o) => !o)}>Columns ▾</button>
+            {menuOpen && (
+              <div className="col-menu">
+                {table.getAllLeafColumns().map((col) => (
+                  <label key={col.id} className="col-menu-item">
+                    <input
+                      type="checkbox"
+                      checked={col.getIsVisible()}
+                      onChange={col.getToggleVisibilityHandler()}
+                    />
+                    <span>{col.columnDef.meta?.label ?? col.id}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

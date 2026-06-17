@@ -1,5 +1,5 @@
 """Performance endpoints for watchlist items and holdings."""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,14 @@ from app.services.upstox import UpstoxError
 
 router = APIRouter(prefix="/performance", tags=["performance"])
 
+# Manually-entered growth fields surfaced on every performance row.
+_GROWTH_FIELDS = (
+    "rev_growth_year",
+    "rev_growth_quarter",
+    "profit_growth_year",
+    "profit_growth_quarter",
+)
+
 
 def _safe_ltp(instrument_keys: list[str]) -> dict[str, dict]:
     try:
@@ -23,18 +31,33 @@ def _safe_ltp(instrument_keys: list[str]) -> dict[str, dict]:
         return {}
 
 
-def _meta_map(db: Session, keys: list[str]) -> dict[str, tuple[list[str], str]]:
-    """Return {instrument_key: (tags, notes)} for the given keys."""
+def _meta_map(db: Session, keys: list[str]) -> dict[str, dict]:
+    """Return {instrument_key: {tags, notes, <growth fields>}} for the keys."""
     if not keys:
         return {}
     rows = db.scalars(
         select(InstrumentMeta).where(InstrumentMeta.instrument_key.in_(keys))
     ).all()
-    return {m.instrument_key: (m.tags or [], m.notes or "") for m in rows}
+    out: dict[str, dict] = {}
+    for m in rows:
+        extra = {"tags": m.tags or [], "notes": m.notes or ""}
+        for f in _GROWTH_FIELDS:
+            extra[f] = getattr(m, f)
+        out[m.instrument_key] = extra
+    return out
+
+
+def _meta_for(meta: dict[str, dict], key: str) -> dict:
+    """Defaults for a stock with no instrument_meta row yet."""
+    return meta.get(key) or {"tags": [], "notes": "", **{f: None for f in _GROWTH_FIELDS}}
 
 
 @router.get("/watchlist/{watchlist_id}", response_model=list[PerformanceRow])
-def watchlist_performance(watchlist_id: int, db: Session = Depends(get_db)):
+def watchlist_performance(
+    watchlist_id: int,
+    rsi: str = Query("day", pattern="^(day|week|month)$"),
+    db: Session = Depends(get_db),
+):
     wl = db.get(Watchlist, watchlist_id)
     if not wl:
         raise HTTPException(status_code=404, detail="Watchlist not found")
@@ -46,15 +69,13 @@ def watchlist_performance(watchlist_id: int, db: Session = Depends(get_db)):
     rows: list[PerformanceRow] = []
     for it in wl.items:
         last_price = ltp.get(it.instrument_key, {}).get("last_price")
-        metrics = performance.compute_metrics(it.instrument_key, last_price)
-        tags, notes = meta.get(it.instrument_key, ([], ""))
+        metrics = performance.compute_metrics(it.instrument_key, last_price, rsi_interval=rsi)
         rows.append(
             PerformanceRow(
                 instrument_key=it.instrument_key,
                 symbol=it.symbol,
                 name=it.name,
-                tags=tags,
-                notes=notes,
+                **_meta_for(meta, it.instrument_key),
                 **metrics,
             )
         )
@@ -62,7 +83,10 @@ def watchlist_performance(watchlist_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/holdings", response_model=HoldingsPerformanceResponse)
-def holdings_performance(db: Session = Depends(get_db)):
+def holdings_performance(
+    rsi: str = Query("day", pattern="^(day|week|month)$"),
+    db: Session = Depends(get_db),
+):
     holdings = db.query(Holding).order_by(Holding.id).all()
     keys = [h.instrument_key for h in holdings]
     ltp = _safe_ltp(keys)
@@ -74,7 +98,7 @@ def holdings_performance(db: Session = Depends(get_db)):
     total_mv = 0.0
     for h in holdings:
         last_price = ltp.get(h.instrument_key, {}).get("last_price")
-        metrics = performance.compute_metrics(h.instrument_key, last_price)
+        metrics = performance.compute_metrics(h.instrument_key, last_price, rsi_interval=rsi)
         price = metrics.get("last_price")
         mv = price * h.quantity if price is not None else None
         if mv is not None:
@@ -89,7 +113,6 @@ def holdings_performance(db: Session = Depends(get_db)):
         pnl = (mv - invested) if mv is not None else None
         if pnl is not None:
             total_pnl += pnl
-        tags, notes = meta.get(h.instrument_key, ([], ""))
         rows.append(
             HoldingPerformanceRow(
                 id=h.id,
@@ -104,8 +127,7 @@ def holdings_performance(db: Session = Depends(get_db)):
                 pnl_pct=round(pnl / invested * 100, 2) if pnl is not None and invested else None,
                 allocation_pct=round(mv / total_mv * 100, 2) if mv is not None and total_mv else None,
                 sector=h.sector,
-                tags=tags,
-                notes=notes,
+                **_meta_for(meta, h.instrument_key),
                 **metrics,
             )
         )
@@ -117,3 +139,4 @@ def holdings_performance(db: Session = Depends(get_db)):
         total_pnl_pct=round(total_pnl / total_invested * 100, 2) if total_invested else 0,
         rows=rows,
     )
+

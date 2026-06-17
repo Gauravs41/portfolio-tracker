@@ -16,7 +16,14 @@ export function NotesCell({ instrumentKey, symbol, name, notes, onChange }: Prop
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => { if (!editing) setDraft(notes); }, [notes, editing]);
-  useEffect(() => { if (editing) ref.current?.focus(); }, [editing]);
+  useEffect(() => {
+    if (editing && ref.current) {
+      ref.current.focus();
+      // place caret at end
+      const v = ref.current.value;
+      ref.current.setSelectionRange(v.length, v.length);
+    }
+  }, [editing]);
 
   async function save() {
     setEditing(false);
@@ -32,28 +39,49 @@ export function NotesCell({ instrumentKey, symbol, name, notes, onChange }: Prop
 
   if (editing) {
     return (
-      <textarea
-        ref={ref}
-        className="notes-input"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={save}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) save();
-          if (e.key === "Escape") { setDraft(notes); setEditing(false); }
-        }}
-        placeholder="note…"
-      />
+      <div className="notes-editor">
+        <textarea
+          ref={ref}
+          className="notes-input"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) save();
+            if (e.key === "Escape") { setDraft(notes); setEditing(false); }
+          }}
+          placeholder="Write a note…"
+        />
+        <div className="notes-actions">
+          <span className="notes-hint">⌘/Ctrl+Enter to save · Esc to cancel</span>
+          <button className="notes-save" onMouseDown={(e) => e.preventDefault()} onClick={save}>
+            Save
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!notes) {
+    return (
+      <button
+        className="notes-add"
+        disabled={busy}
+        onClick={() => setEditing(true)}
+        title="Add a note"
+      >
+        <span className="notes-add-icon">＋</span> note
+      </button>
     );
   }
 
   return (
     <div
-      className={`notes-view ${notes ? "" : "muted"}`}
+      className="notes-chip"
       onClick={() => !busy && setEditing(true)}
       title="Click to edit"
     >
-      {notes || "add note"}
+      <span className="notes-chip-icon">🗒</span>
+      <span className="notes-chip-text">{notes}</span>
     </div>
   );
 }

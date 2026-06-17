@@ -52,12 +52,25 @@ class _Cache:
     instruments: list[dict] | None = None
     instruments_loaded_at: float = 0.0
     fundamentals: dict[str, tuple[float, dict]] = field(default_factory=dict)
+    # Historical candles keyed by (instrument_key, interval) -> (ts, candles).
+    candles: dict[tuple[str, str], tuple[float, list[list]]] = field(default_factory=dict)
 
 
 _cache = _Cache(ttl=get_settings().quote_cache_ttl)
 
 # Fundamentals (key ratios) change slowly; cache for several hours.
 FUNDAMENTALS_TTL = 6 * 3600
+
+# Candles change at most once per trading day; cache for an hour.
+CANDLES_TTL = 3600
+
+# Supported candle intervals and how far back to look (calendar days) so we get
+# enough completed bars to compute RSI(14) + SMA(50).
+CANDLE_INTERVALS = {
+    "day": 90,
+    "week": 800,
+    "month": 2600,
+}
 
 
 def _headers() -> dict[str, str]:
@@ -198,14 +211,25 @@ def get_ltp(instrument_keys: list[str]) -> dict[str, dict]:
 # Historical candles
 # ---------------------------------------------------------------------------
 
-def get_daily_candles(instrument_key: str, days: int = 45) -> list[list]:
-    """Return daily candles: [ [timestamp, open, high, low, close, volume, oi], ... ]
+def get_period_candles(instrument_key: str, interval: str = "day") -> list[list]:
+    """Return candles for an interval (day/week/month), oldest -> newest.
 
-    Ordered oldest -> newest. Empty list on failure.
+    Cached per (instrument_key, interval) for CANDLES_TTL. Empty list on failure
+    of an unknown interval; network errors raise UpstoxError.
     """
+    interval = interval if interval in CANDLE_INTERVALS else "day"
+    cache_key = (instrument_key, interval)
+    now = time.time()
+    cached = _cache.candles.get(cache_key)
+    if cached and (now - cached[0]) < CANDLES_TTL:
+        return cached[1]
+
     to_date = date.today()
-    from_date = to_date - timedelta(days=days)
-    url = f"{API_BASE}/historical-candle/{instrument_key}/day/{to_date.isoformat()}/{from_date.isoformat()}"
+    from_date = to_date - timedelta(days=CANDLE_INTERVALS[interval])
+    url = (
+        f"{API_BASE}/historical-candle/{instrument_key}/{interval}/"
+        f"{to_date.isoformat()}/{from_date.isoformat()}"
+    )
     try:
         with httpx.Client(timeout=30) as client:
             resp = client.get(url, headers=_headers())
@@ -214,7 +238,14 @@ def get_daily_candles(instrument_key: str, days: int = 45) -> list[list]:
     except (httpx.HTTPError, ValueError) as exc:  # pragma: no cover - network
         raise UpstoxError(f"Failed to fetch candles for {instrument_key}: {exc}") from exc
     # Upstox returns newest-first; normalize to oldest-first.
-    return list(reversed(candles))
+    ordered = list(reversed(candles))
+    _cache.candles[cache_key] = (now, ordered)
+    return ordered
+
+
+def get_daily_candles(instrument_key: str, days: int = 45) -> list[list]:
+    """Backwards-compatible daily-candle accessor (see get_period_candles)."""
+    return get_period_candles(instrument_key, "day")
 
 
 # ---------------------------------------------------------------------------

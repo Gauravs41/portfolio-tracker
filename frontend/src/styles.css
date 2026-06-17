@@ -187,23 +187,79 @@ tr.filter-row th { padding-top: 0; padding-bottom: 8px; border-bottom: 1px solid
 .chip-input { width: 90px; padding: 2px 6px; font-size: 12px; }
 
 /* ---- Notes ---- */
-.notes-view {
+.notes-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
   cursor: pointer;
-  max-width: 200px;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-size: 13px;
-  text-align: left;
 }
-.notes-input {
+.notes-add:hover { border-color: var(--accent); color: var(--accent); }
+.notes-add-icon { font-size: 13px; line-height: 1; }
+
+.notes-chip {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 220px;
   background: var(--panel-2);
   border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  text-align: left;
+}
+.notes-chip:hover { border-color: var(--accent); }
+.notes-chip-icon { font-size: 13px; line-height: 1.3; opacity: .8; }
+.notes-chip-text {
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+}
+
+.notes-editor { display: flex; flex-direction: column; gap: 6px; }
+.notes-input {
+  background: var(--panel-2);
+  border: 1px solid var(--accent);
   color: var(--text);
   border-radius: 8px;
   padding: 6px 8px;
   font-size: 13px;
-  width: 200px;
-  min-height: 48px;
+  width: 220px;
+  min-height: 56px;
   resize: vertical;
   font-family: inherit;
 }
+.notes-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.notes-hint { font-size: 10px; color: var(--muted); }
+.notes-save { padding: 4px 12px; font-size: 12px; }
+
+/* ---- Growth cells (manual forward estimates) ---- */
+.growth-view {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  border-bottom: 1px dashed transparent;
+}
+.growth-view:hover { border-bottom-color: currentColor; }
+.growth-input {
+  width: 72px;
+  padding: 4px 6px;
+  font-size: 12px;
+  text-align: right;
+}
+
+/* ---- RSI timeframe selector (table toolbar) ---- */
+.rsi-selector { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.rsi-selector select { padding: 6px 8px; }

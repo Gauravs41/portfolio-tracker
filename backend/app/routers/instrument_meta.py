@@ -1,5 +1,6 @@
 """Per-instrument metadata: free-form tags + notes (global, shared across views)."""
 from fastapi import APIRouter, Depends
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -7,6 +8,17 @@ from app.models import InstrumentMeta
 from app.schemas import InstrumentMetaOut, InstrumentMetaUpdate
 
 router = APIRouter(prefix="/instrument-meta", tags=["instrument-meta"])
+
+
+@router.get("/tags", response_model=list[str])
+def list_tags(db: Session = Depends(get_db)):
+    """Distinct tags across all instruments, sorted, for autocomplete."""
+    seen: set[str] = set()
+    for tags in db.scalars(select(InstrumentMeta.tags)).all():
+        for t in tags or []:
+            if t:
+                seen.add(t)
+    return sorted(seen, key=str.lower)
 
 
 @router.get("/{instrument_key}", response_model=InstrumentMetaOut)

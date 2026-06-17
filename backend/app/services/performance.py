@@ -7,7 +7,12 @@ from app.services.upstox import UpstoxError
 # Candle index constants (Upstox candle: [ts, open, high, low, close, volume, oi]).
 CLOSE = 4
 
-# Trading-day offsets for each window.
+# Number of trading sessions each window spans. We build a price *series* whose
+# last point is "today" (the live price, or the most recent completed close when
+# markets are shut), so an N-session change compares today against the close N
+# sessions earlier:
+#   1D  -> today vs yesterday (today's return only)
+#   3D  -> today vs 3 sessions ago (today + the prior 2 days)
 WINDOWS = {
     "change_1d": 1,
     "change_3d": 3,
@@ -15,6 +20,9 @@ WINDOWS = {
     "change_2w": 10,
     "change_1m": 21,
 }
+
+# RSI timeframe -> Upstox candle interval.
+RSI_INTERVALS = {"day": "day", "week": "week", "month": "month"}
 
 
 def _pct(curr: float, prev: float) -> float | None:
@@ -66,15 +74,22 @@ def _sentiment(change_1w: float | None, price: float | None, sma50: float | None
     return "neutral"
 
 
-def compute_metrics(instrument_key: str, last_price: float | None = None) -> dict:
+def compute_metrics(
+    instrument_key: str,
+    last_price: float | None = None,
+    rsi_interval: str = "day",
+) -> dict:
     """Return performance windows + indicators for one instrument.
 
+    The daily window % changes always use daily candles. ``rsi_interval``
+    (day/week/month) selects the timeframe used for the RSI value only.
     Falls back to empty/None values if candles can't be fetched.
     """
     result: dict = {
         "last_price": last_price,
         "prev_close": None,
         "rsi_14": None,
+        "rsi_interval": rsi_interval if rsi_interval in RSI_INTERVALS else "day",
         "sma_20": None,
         "sma_50": None,
         "pe_ratio": None,
@@ -90,7 +105,7 @@ def compute_metrics(instrument_key: str, last_price: float | None = None) -> dic
         result["pe_ratio"] = None
 
     try:
-        candles = upstox.get_daily_candles(instrument_key)
+        candles = upstox.get_period_candles(instrument_key, "day")
     except UpstoxError:
         candles = []
 
@@ -98,19 +113,37 @@ def compute_metrics(instrument_key: str, last_price: float | None = None) -> dic
     if not closes:
         return result
 
-    current = last_price if last_price is not None else closes[-1]
+    # Daily candles from Upstox exclude the current session, so the newest close
+    # is yesterday's. Build a unified series ending at "today": the live price
+    # when available, otherwise the most recent completed close.
+    if last_price is not None:
+        series = closes + [last_price]
+    else:
+        series = closes
+    current = series[-1]
     result["last_price"] = current
-    result["prev_close"] = closes[-1] if last_price is None and len(closes) >= 1 else (
-        closes[-1] if len(closes) >= 1 else None
-    )
+    result["prev_close"] = series[-2] if len(series) >= 2 else None
 
+    # change_N compares today (series[-1]) against the close N sessions earlier.
     for key, offset in WINDOWS.items():
-        if len(closes) > offset:
-            result[key] = _pct(current, closes[-1 - offset])
+        if len(series) > offset:
+            result[key] = _pct(series[-1], series[-1 - offset])
 
-    result["sma_20"] = _sma(closes, 20)
-    result["sma_50"] = _sma(closes, 50)
-    result["rsi_14"] = _rsi(closes, 14)
+    result["sma_20"] = _sma(series, 20)
+    result["sma_50"] = _sma(series, 50)
+
+    # RSI on the requested timeframe. Daily reuses the series above; week/month
+    # fetch their own candles.
+    interval = result["rsi_interval"]
+    if interval == "day":
+        rsi_closes = series
+    else:
+        try:
+            period_candles = upstox.get_period_candles(instrument_key, interval)
+        except UpstoxError:
+            period_candles = []
+        rsi_closes = [c[CLOSE] for c in period_candles if len(c) > CLOSE and c[CLOSE] is not None]
+    result["rsi_14"] = _rsi(rsi_closes, 14)
 
     if result["sma_50"] is not None and current is not None:
         result["trend"] = "above_sma50" if current >= result["sma_50"] else "below_sma50"

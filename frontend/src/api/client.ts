@@ -5,6 +5,7 @@ import type {
   Instrument,
   InstrumentMeta,
   PerformanceRow,
+  RsiInterval,
   Watchlist,
   WatchlistItem,
 } from "../types";
@@ -29,7 +30,7 @@ export const api = {
   searchInstruments: (q: string) =>
     req<Instrument[]>(`/instruments/search?q=${encodeURIComponent(q)}`),
 
-  // instrument metadata (tags / notes, global per stock)
+  // instrument metadata (tags / notes / growth, global per stock)
   getInstrumentMeta: (key: string) =>
     req<InstrumentMeta>(`/instrument-meta/${encodeURIComponent(key)}`),
   updateInstrumentMeta: (key: string, payload: Partial<InstrumentMeta>) =>
@@ -37,6 +38,7 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(payload),
     }),
+  listTags: () => req<string[]>("/instrument-meta/tags"),
 
   // watchlists
   listWatchlists: () => req<Watchlist[]>("/watchlists"),
@@ -66,9 +68,10 @@ export const api = {
     req<void>(`/holdings/${id}`, { method: "DELETE" }),
 
   // performance
-  watchlistPerformance: (id: number) =>
-    req<PerformanceRow[]>(`/performance/watchlist/${id}`),
-  holdingsPerformance: () => req<HoldingsPerformance>("/performance/holdings"),
+  watchlistPerformance: (id: number, rsi: RsiInterval = "day") =>
+    req<PerformanceRow[]>(`/performance/watchlist/${id}?rsi=${rsi}`),
+  holdingsPerformance: (rsi: RsiInterval = "day") =>
+    req<HoldingsPerformance>(`/performance/holdings?rsi=${rsi}`),
 
   // diversification
   diversification: () => req<Diversification>("/diversification"),

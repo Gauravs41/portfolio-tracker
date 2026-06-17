@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { api } from "../api/client";
 
 interface Props {
@@ -6,13 +6,18 @@ interface Props {
   symbol: string;
   name: string;
   tags: string[];
+  knownTags?: string[]; // for autocomplete suggestions
   onChange: () => void; // refresh parent after save
 }
 
-export function TagsCell({ instrumentKey, symbol, name, tags, onChange }: Props) {
+export function TagsCell({ instrumentKey, symbol, name, tags, knownTags = [], onChange }: Props) {
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const listId = useId();
+
+  // Suggest tags that exist elsewhere but aren't already on this stock.
+  const suggestions = knownTags.filter((t) => !tags.includes(t));
 
   async function save(next: string[]) {
     setBusy(true);
@@ -45,18 +50,24 @@ export function TagsCell({ instrumentKey, symbol, name, tags, onChange }: Props)
         </span>
       ))}
       {adding ? (
-        <input
-          className="chip-input"
-          autoFocus
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={addTag}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") addTag();
-            if (e.key === "Escape") { setDraft(""); setAdding(false); }
-          }}
-          placeholder="tag…"
-        />
+        <>
+          <input
+            className="chip-input"
+            autoFocus
+            list={listId}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={addTag}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") addTag();
+              if (e.key === "Escape") { setDraft(""); setAdding(false); }
+            }}
+            placeholder="tag…"
+          />
+          <datalist id={listId}>
+            {suggestions.map((t) => <option key={t} value={t} />)}
+          </datalist>
+        </>
       ) : (
         <button className="chip-add" disabled={busy} onClick={() => setAdding(true)}>+ tag</button>
       )}
