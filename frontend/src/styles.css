@@ -263,3 +263,80 @@ tr.filter-row th { padding-top: 0; padding-bottom: 8px; border-bottom: 1px solid
 /* ---- RSI timeframe selector (table toolbar) ---- */
 .rsi-selector { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
 .rsi-selector select { padding: 6px 8px; }
+
+/* ---- Symbol -> chart trigger ---- */
+.symbol-link {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  font-size: inherit;
+}
+.symbol-link strong { border-bottom: 1px dashed transparent; }
+.symbol-link:hover strong { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ---- Chart modal (TradingView Lightweight Charts) ---- */
+.chart-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.chart-modal {
+  width: min(1100px, 95vw);
+  height: min(640px, 90vh);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+.chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.chart-title { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.chart-symbol { font-size: 18px; font-weight: 700; }
+.chart-name { color: var(--muted); font-size: 13px; }
+.chart-quote { font-size: 15px; font-weight: 600; }
+
+.chart-intervals {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.chart-iv {
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  border-radius: 0;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+.chart-iv:hover { background: var(--panel-2); color: var(--text); }
+.chart-iv.active { background: var(--accent); color: #fff; }
+.chart-close { padding: 6px 10px; }
+
+.chart-body {
+  flex: 1;
+  min-height: 0;
+  padding: 8px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+

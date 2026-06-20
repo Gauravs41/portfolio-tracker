@@ -7,6 +7,7 @@ import { TagsCell } from "../components/TagsCell";
 import { NotesCell } from "../components/NotesCell";
 import { GrowthCell } from "../components/GrowthCell";
 import { RsiSelector } from "../components/RsiSelector";
+import { ChartModal } from "../components/ChartModal";
 import { BullBearBadge } from "../components/BullBearBadge";
 import { Num, Pct } from "../components/format";
 import type { Instrument, PerformanceRow, RsiInterval, Watchlist } from "../types";
@@ -22,6 +23,7 @@ export default function Watchlists() {
   const [error, setError] = useState("");
   const [rsi, setRsi] = useState<RsiInterval>("day");
   const [knownTags, setKnownTags] = useState<string[]>([]);
+  const [chartRow, setChartRow] = useState<PerformanceRow | null>(null);
 
   async function loadWatchlists() {
     const wl = await api.listWatchlists();
@@ -94,10 +96,15 @@ export default function Watchlists() {
       header: "Symbol",
       meta: { label: "Symbol", filterVariant: "text" },
       cell: (c) => (
-        <div>
+        <button
+          type="button"
+          className="symbol-link"
+          title="Open chart"
+          onClick={() => setChartRow(c.row.original)}
+        >
           <strong>{c.row.original.symbol}</strong>
           <div className="muted" style={{ fontSize: 12 }}>{c.row.original.name}</div>
-        </div>
+        </button>
       ),
     },
     { accessorKey: "last_price", header: "LTP", meta: { label: "LTP", filterVariant: "number" }, cell: (c) => <Num value={c.getValue()} prefix="₹" /> },
@@ -204,6 +211,15 @@ export default function Watchlists() {
       )}
 
       {!watchlists.length && <p className="muted">Create your first watchlist to get started.</p>}
+
+      {chartRow && (
+        <ChartModal
+          instrumentKey={chartRow.instrument_key}
+          symbol={chartRow.symbol}
+          name={chartRow.name}
+          onClose={() => setChartRow(null)}
+        />
+      )}
     </div>
   );
 }

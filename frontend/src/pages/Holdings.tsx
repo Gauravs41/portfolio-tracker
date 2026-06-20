@@ -7,6 +7,7 @@ import { TagsCell } from "../components/TagsCell";
 import { NotesCell } from "../components/NotesCell";
 import { GrowthCell } from "../components/GrowthCell";
 import { RsiSelector } from "../components/RsiSelector";
+import { ChartModal } from "../components/ChartModal";
 import { BullBearBadge } from "../components/BullBearBadge";
 import { Num, Pct } from "../components/format";
 import type { HoldingPerformanceRow, HoldingsPerformance, Instrument, RsiInterval } from "../types";
@@ -24,6 +25,7 @@ export default function Holdings() {
   const [loading, setLoading] = useState(true);
   const [rsi, setRsi] = useState<RsiInterval>("day");
   const [knownTags, setKnownTags] = useState<string[]>([]);
+  const [chartRow, setChartRow] = useState<HoldingPerformanceRow | null>(null);
 
   // add-holding form
   const [selected, setSelected] = useState<Instrument | null>(null);
@@ -79,7 +81,7 @@ export default function Holdings() {
   }
 
   const columns = useMemo<ColumnDef<HoldingPerformanceRow, any>[]>(() => [
-    { accessorKey: "symbol", header: "Symbol", meta: { label: "Symbol", filterVariant: "text" }, cell: (c) => <strong>{c.getValue()}</strong> },
+    { accessorKey: "symbol", header: "Symbol", meta: { label: "Symbol", filterVariant: "text" }, cell: (c) => <button type="button" className="symbol-link" title="Open chart" onClick={() => setChartRow(c.row.original)}><strong>{c.getValue()}</strong></button> },
     { accessorKey: "quantity", header: "Qty", meta: { label: "Qty", filterVariant: "number" }, cell: (c) => <Num value={c.getValue()} /> },
     { accessorKey: "avg_buy_price", header: "Avg", meta: { label: "Avg", filterVariant: "number" }, cell: (c) => <Num value={c.getValue()} prefix="₹" /> },
     { accessorKey: "last_price", header: "LTP", meta: { label: "LTP", filterVariant: "number" }, cell: (c) => <Num value={c.getValue()} prefix="₹" /> },
@@ -211,6 +213,15 @@ export default function Holdings() {
           />
         )}
       </div>
+
+      {chartRow && (
+        <ChartModal
+          instrumentKey={chartRow.instrument_key}
+          symbol={chartRow.symbol}
+          name={chartRow.name}
+          onClose={() => setChartRow(null)}
+        />
+      )}
     </div>
   );
 }
