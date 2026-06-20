@@ -1,5 +1,7 @@
 import type {
   CandlesResponse,
+  ChartDrawing,
+  ChartDrawingsResponse,
   Diversification,
   Holding,
   HoldingsPerformance,
@@ -82,4 +84,13 @@ export const api = {
     req<CandlesResponse>(
       `/candles/${encodeURIComponent(instrumentKey)}?interval=${interval}`,
     ),
+
+  // chart drawings (user annotations, persisted per instrument)
+  getDrawings: (instrumentKey: string) =>
+    req<ChartDrawingsResponse>(`/chart-drawings/${encodeURIComponent(instrumentKey)}`),
+  saveDrawings: (instrumentKey: string, drawings: ChartDrawing[]) =>
+    req<ChartDrawingsResponse>(`/chart-drawings/${encodeURIComponent(instrumentKey)}`, {
+      method: "PUT",
+      body: JSON.stringify({ drawings }),
+    }),
 };

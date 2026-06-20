@@ -130,3 +130,23 @@ export interface Diversification {
   by_sector: DiversificationSlice[];
   by_board: DiversificationSlice[];
 }
+
+// ---- Chart drawings ----
+export type DrawingType = "hline" | "trend" | "rect" | "fib" | "measure";
+
+export interface DrawingPoint {
+  time: string; // bar time "YYYY-MM-DD"
+  price: number;
+}
+
+export interface ChartDrawing {
+  id: string;
+  type: DrawingType;
+  points: DrawingPoint[];
+  color: string;
+}
+
+export interface ChartDrawingsResponse {
+  instrument_key: string;
+  drawings: ChartDrawing[];
+}

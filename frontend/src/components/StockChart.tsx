@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CandlestickSeries,
   ColorType,
@@ -17,6 +17,8 @@ import {
 } from "lightweight-charts";
 import type { Candle } from "../types";
 import { bollinger, ema, rsi, sma, type LinePoint } from "../lib/indicators";
+import { DrawingOverlay, type Tool } from "./DrawingOverlay";
+import type { ChartDrawing } from "../types";
 
 const UP = "#26a69a";
 const DOWN = "#ef5350";
@@ -48,16 +50,31 @@ interface Props {
   candles: Candle[];
   indicators: IndicatorState;
   height?: number;
+  tool?: Tool;
+  drawingColor?: string;
+  drawings?: ChartDrawing[];
+  onDrawingsChange?: (drawings: ChartDrawing[]) => void;
+  onToolDone?: () => void;
 }
 
 const toLine = (pts: LinePoint[]): LineData<Time>[] =>
   pts.map((p) => ({ time: p.time as Time, value: p.value }));
 
 /** TradingView Lightweight Charts: candles + overlays + volume + RSI pane. */
-export function StockChart({ candles, indicators, height }: Props) {
+export function StockChart({
+  candles,
+  indicators,
+  height,
+  tool = "cursor",
+  drawingColor = "#4c8dff",
+  drawings = [],
+  onDrawingsChange,
+  onToolDone,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const priceRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const [ready, setReady] = useState(false);
   const volRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const sma20Ref = useRef<ISeriesApi<"Line"> | null>(null);
   const sma50Ref = useRef<ISeriesApi<"Line"> | null>(null);
@@ -133,9 +150,11 @@ export function StockChart({ candles, indicators, height }: Props) {
     priceRef.current = price;
     volRef.current = vol;
     rsiRef.current = rsiSeries;
+    setReady(true);
 
     return () => {
       chart.remove();
+      setReady(false);
       chartRef.current = null;
       priceRef.current = null;
       volRef.current = null;
@@ -218,9 +237,21 @@ export function StockChart({ candles, indicators, height }: Props) {
 
   return (
     <div
-      ref={containerRef}
-      className="stock-chart"
+      className="stock-chart-wrap"
       style={height ? { width: "100%", height } : undefined}
-    />
+    >
+      <div ref={containerRef} className="stock-chart" />
+      {ready && chartRef.current && priceRef.current && onDrawingsChange && (
+        <DrawingOverlay
+          chart={chartRef.current}
+          series={priceRef.current}
+          tool={tool}
+          color={drawingColor}
+          drawings={drawings}
+          onChange={onDrawingsChange}
+          onToolDone={onToolDone ?? (() => {})}
+        />
+      )}
+    </div>
   );
 }

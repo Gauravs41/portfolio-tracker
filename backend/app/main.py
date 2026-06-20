@@ -8,6 +8,7 @@ from app.config import get_settings
 from app.db import Base, engine
 from app.routers import (
     candles,
+    chart_drawings,
     diversification,
     holdings,
     instrument_meta,
@@ -42,6 +43,7 @@ app.include_router(watchlists.router)
 app.include_router(holdings.router)
 app.include_router(performance.router)
 app.include_router(candles.router)
+app.include_router(chart_drawings.router)
 app.include_router(diversification.router)
 
 

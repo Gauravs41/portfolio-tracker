@@ -55,6 +55,12 @@ CREATE TABLE IF NOT EXISTS instrument_meta (
 -- ALTER TABLE instrument_meta ADD COLUMN IF NOT EXISTS profit_growth_year DOUBLE PRECISION;
 -- ALTER TABLE instrument_meta ADD COLUMN IF NOT EXISTS profit_growth_quarter DOUBLE PRECISION;
 
+CREATE TABLE IF NOT EXISTS chart_drawings (
+    instrument_key  VARCHAR(64) PRIMARY KEY,
+    drawings        JSONB DEFAULT '[]'::jsonb,
+    updated_at      TIMESTAMPTZ DEFAULT now()
+);
+
 -- ---------------------------------------------------------------------------
 -- Future-ready stub tables
 -- ---------------------------------------------------------------------------

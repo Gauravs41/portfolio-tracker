@@ -164,6 +164,17 @@ class CandlesResponse(BaseModel):
     candles: list[Candle] = []
 
 
+# ---- Chart drawings (user annotations persisted per instrument) ----
+class ChartDrawingsOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    instrument_key: str
+    drawings: list[dict] = []
+
+
+class ChartDrawingsUpdate(BaseModel):
+    drawings: list[dict] = []
+
+
 # ---- Diversification ----
 class DiversificationSlice(BaseModel):
     label: str

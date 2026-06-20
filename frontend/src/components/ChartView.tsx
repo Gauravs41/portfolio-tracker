@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
-import type { Candle, RsiInterval } from "../types";
+import type { Candle, ChartDrawing, RsiInterval } from "../types";
 import {
   DEFAULT_INDICATORS,
   StockChart,
   type IndicatorState,
 } from "./StockChart";
+import { DrawingToolbar } from "./DrawingToolbar";
+import type { Tool } from "./DrawingOverlay";
 
 const INTERVALS: { value: RsiInterval; label: string }[] = [
   { value: "day", label: "1D" },
@@ -40,7 +42,7 @@ interface Props {
   name: string;
 }
 
-/** Interval pills + indicator menu + data fetch, wrapping the chart canvas. */
+/** Interval pills + indicator menu + drawing rail + data fetch + persistence. */
 export function ChartView({ instrumentKey, symbol, name }: Props) {
   const [interval, setIntervalState] = useState<RsiInterval>("day");
   const [candles, setCandles] = useState<Candle[]>([]);
@@ -49,6 +51,11 @@ export function ChartView({ instrumentKey, symbol, name }: Props) {
   const [indicators, setIndicators] = useState<IndicatorState>(loadIndicators);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const [tool, setTool] = useState<Tool>("cursor");
+  const [color, setColor] = useState("#4c8dff");
+  const [drawings, setDrawings] = useState<ChartDrawing[]>([]);
+  const skipSaveRef = useRef(true);
 
   useEffect(() => {
     let alive = true;
@@ -64,6 +71,31 @@ export function ChartView({ instrumentKey, symbol, name }: Props) {
     };
   }, [instrumentKey, interval]);
 
+  // Load saved drawings for the instrument (shared across intervals).
+  useEffect(() => {
+    let alive = true;
+    skipSaveRef.current = true;
+    api
+      .getDrawings(instrumentKey)
+      .then((r) => alive && setDrawings(r.drawings ?? []))
+      .catch(() => alive && setDrawings([]));
+    return () => {
+      alive = false;
+    };
+  }, [instrumentKey]);
+
+  // Debounced persistence on change (skips the initial load).
+  useEffect(() => {
+    if (skipSaveRef.current) {
+      skipSaveRef.current = false;
+      return;
+    }
+    const t = window.setTimeout(() => {
+      api.saveDrawings(instrumentKey, drawings).catch(() => {});
+    }, 600);
+    return () => window.clearTimeout(t);
+  }, [drawings, instrumentKey]);
+
   useEffect(() => {
     localStorage.setItem(STORE_KEY, JSON.stringify(indicators));
   }, [indicators]);
@@ -78,6 +110,15 @@ export function ChartView({ instrumentKey, symbol, name }: Props) {
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, [menuOpen]);
+
+  // Esc cancels an in-progress drawing / returns to cursor.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && tool !== "cursor") setTool("cursor");
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [tool]);
 
   const toggle = (key: keyof IndicatorState) =>
     setIndicators((s) => ({ ...s, [key]: !s[key] }));
@@ -120,6 +161,14 @@ export function ChartView({ instrumentKey, symbol, name }: Props) {
             ))}
           </div>
 
+          <input
+            type="color"
+            className="draw-color"
+            value={color}
+            title="Drawing color"
+            onChange={(e) => setColor(e.target.value)}
+          />
+
           <div className="col-menu-wrap" ref={menuRef}>
             <button className="ghost" onClick={() => setMenuOpen((o) => !o)}>
               Indicators ▾
@@ -133,10 +182,7 @@ export function ChartView({ instrumentKey, symbol, name }: Props) {
                       checked={indicators[t.key]}
                       onChange={() => toggle(t.key)}
                     />
-                    <span
-                      className="ind-swatch"
-                      style={{ background: t.color }}
-                    />
+                    <span className="ind-swatch" style={{ background: t.color }} />
                     {t.label}
                   </label>
                 ))}
@@ -146,16 +192,33 @@ export function ChartView({ instrumentKey, symbol, name }: Props) {
         </div>
       </div>
 
-      <div className="chart-canvas">
-        {error ? (
-          <div className="error">{error}</div>
-        ) : loading && candles.length === 0 ? (
-          <p className="muted">Loading chart…</p>
-        ) : candles.length === 0 ? (
-          <p className="muted">No candle data available.</p>
-        ) : (
-          <StockChart candles={candles} indicators={indicators} />
-        )}
+      <div className="chart-main">
+        <DrawingToolbar
+          tool={tool}
+          onTool={setTool}
+          onUndo={() => setDrawings((d) => d.slice(0, -1))}
+          onClear={() => setDrawings([])}
+          canUndo={drawings.length > 0}
+        />
+        <div className="chart-canvas">
+          {error ? (
+            <div className="error">{error}</div>
+          ) : loading && candles.length === 0 ? (
+            <p className="muted">Loading chart…</p>
+          ) : candles.length === 0 ? (
+            <p className="muted">No candle data available.</p>
+          ) : (
+            <StockChart
+              candles={candles}
+              indicators={indicators}
+              tool={tool}
+              drawingColor={color}
+              drawings={drawings}
+              onDrawingsChange={setDrawings}
+              onToolDone={() => setTool("cursor")}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

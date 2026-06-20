@@ -82,6 +82,22 @@ class InstrumentMeta(Base):
     profit_growth_quarter: Mapped[float | None] = mapped_column(Float, nullable=True)
 
 
+class ChartDrawing(Base):
+    """User chart annotations (trend lines, rectangles, fib, etc.) per instrument.
+
+    Stored as a single JSON array per instrument so all drawings round-trip in
+    one GET/PUT. Anchored by time+price so they apply across day/week/month.
+    """
+
+    __tablename__ = "chart_drawings"
+
+    instrument_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    drawings: Mapped[list] = mapped_column(JSON, default=list)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 # ---------------------------------------------------------------------------
 # Future-ready stub tables (no Phase 1 logic; present so schema is forward-ready)
 # ---------------------------------------------------------------------------
