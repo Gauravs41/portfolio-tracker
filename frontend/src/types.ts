@@ -24,6 +24,21 @@ export interface InstrumentMeta {
 
 export type RsiInterval = "day" | "week" | "month";
 
+export interface Candle {
+  time: string; // "YYYY-MM-DD"
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+export interface CandlesResponse {
+  instrument_key: string;
+  interval: RsiInterval;
+  candles: Candle[];
+}
+
 export type GrowthField =
   | "rev_growth_year"
   | "rev_growth_quarter"

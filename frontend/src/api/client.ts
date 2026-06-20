@@ -1,4 +1,5 @@
 import type {
+  CandlesResponse,
   Diversification,
   Holding,
   HoldingsPerformance,
@@ -75,4 +76,10 @@ export const api = {
 
   // diversification
   diversification: () => req<Diversification>("/diversification"),
+
+  // candles (OHLCV for charts)
+  candles: (instrumentKey: string, interval: RsiInterval = "day") =>
+    req<CandlesResponse>(
+      `/candles/${encodeURIComponent(instrumentKey)}?interval=${interval}`,
+    ),
 };
