@@ -290,8 +290,8 @@ tr.filter-row th { padding-top: 0; padding-bottom: 8px; border-bottom: 1px solid
   padding: 24px;
 }
 .chart-modal {
-  width: min(1100px, 95vw);
-  height: min(640px, 90vh);
+  width: min(1400px, 96vw);
+  height: min(860px, 92vh);
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -311,32 +311,22 @@ tr.filter-row th { padding-top: 0; padding-bottom: 8px; border-bottom: 1px solid
 .chart-title { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .chart-symbol { font-size: 18px; font-weight: 700; }
 .chart-name { color: var(--muted); font-size: 13px; }
-.chart-quote { font-size: 15px; font-weight: 600; }
 
-.chart-intervals {
+.chart-newtab {
   display: inline-flex;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
-}
-.chart-iv {
+  align-items: center;
   background: transparent;
-  color: var(--muted);
-  border: none;
-  border-radius: 0;
-  padding: 6px 12px;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 7px 12px;
   font-size: 13px;
+  cursor: pointer;
 }
-.chart-iv:hover { background: var(--panel-2); color: var(--text); }
-.chart-iv.active { background: var(--accent); color: #fff; }
+.chart-newtab:hover { border-color: var(--accent); color: var(--accent); }
 .chart-close { padding: 6px 10px; }
 
-.chart-body {
-  flex: 1;
-  min-height: 0;
-  padding: 8px 12px 12px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
+.chart-body { flex: 1; min-height: 0; padding: 0; }
+.tv-container { width: 100%; height: 100%; }
+
 

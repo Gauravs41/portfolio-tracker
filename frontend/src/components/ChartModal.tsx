@@ -1,13 +1,34 @@
-import { useEffect, useState } from "react";
-import { api } from "../api/client";
-import type { Candle, RsiInterval } from "../types";
-import { StockChart } from "./StockChart";
+import { useEffect, useId, useRef } from "react";
 
-const INTERVALS: { value: RsiInterval; label: string }[] = [
-  { value: "day", label: "1D" },
-  { value: "week", label: "1W" },
-  { value: "month", label: "1M" },
-];
+const TV_SRC = "https://s3.tradingview.com/tv.js";
+let tvLoader: Promise<void> | null = null;
+
+/** Load TradingView's tv.js once and cache the promise. */
+function loadTradingView(): Promise<void> {
+  if (typeof window !== "undefined" && (window as any).TradingView) {
+    return Promise.resolve();
+  }
+  if (tvLoader) return tvLoader;
+  tvLoader = new Promise<void>((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = TV_SRC;
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => {
+      tvLoader = null;
+      reject(new Error("Failed to load TradingView"));
+    };
+    document.head.appendChild(s);
+  });
+  return tvLoader;
+}
+
+/** Build a TradingView ticker ("NSE:RELIANCE") from our instrument key + symbol. */
+function tvSymbol(instrumentKey: string, symbol: string): string {
+  const ex = (instrumentKey.split("_")[0] || "NSE").toUpperCase();
+  const prefix = ex === "BSE" ? "BSE" : "NSE";
+  return `${prefix}:${symbol.toUpperCase()}`;
+}
 
 interface Props {
   instrumentKey: string;
@@ -17,24 +38,10 @@ interface Props {
 }
 
 export function ChartModal({ instrumentKey, symbol, name, onClose }: Props) {
-  const [interval, setInterval] = useState<RsiInterval>("day");
-  const [candles, setCandles] = useState<Candle[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    let alive = true;
-    setLoading(true);
-    setError("");
-    api
-      .candles(instrumentKey, interval)
-      .then((r) => alive && setCandles(r.candles))
-      .catch((e) => alive && setError(String(e)))
-      .finally(() => alive && setLoading(false));
-    return () => {
-      alive = false;
-    };
-  }, [instrumentKey, interval]);
+  const rawId = useId();
+  const containerId = "tv_" + rawId.replace(/[^a-zA-Z0-9_]/g, "");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const sym = tvSymbol(instrumentKey, symbol);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -42,10 +49,43 @@ export function ChartModal({ instrumentKey, symbol, name, onClose }: Props) {
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const last = candles.length ? candles[candles.length - 1] : undefined;
-  const prev = candles.length > 1 ? candles[candles.length - 2] : undefined;
-  const change =
-    last && prev && prev.close ? ((last.close - prev.close) / prev.close) * 100 : null;
+  useEffect(() => {
+    let cancelled = false;
+    loadTradingView()
+      .then(() => {
+        if (cancelled || !containerRef.current) return;
+        containerRef.current.innerHTML = "";
+        // eslint-disable-next-line no-new
+        new (window as any).TradingView.widget({
+          container_id: containerId,
+          symbol: sym,
+          autosize: true,
+          interval: "D",
+          timezone: "Asia/Kolkata",
+          theme: "dark",
+          style: "1", // candles
+          locale: "in",
+          toolbar_bg: "#0f1115",
+          enable_publishing: false,
+          withdateranges: true,
+          hide_side_toolbar: false, // drawing tools
+          allow_symbol_change: true,
+          details: true,
+          show_popup_button: true,
+          popup_width: "1200",
+          popup_height: "740",
+        });
+      })
+      .catch(() => {
+        /* network blocked; widget simply won't render */
+      });
+    return () => {
+      cancelled = true;
+      if (containerRef.current) containerRef.current.innerHTML = "";
+    };
+  }, [sym, containerId]);
+
+  const tvUrl = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(sym)}`;
 
   return (
     <div className="chart-overlay" onMouseDown={onClose}>
@@ -54,47 +94,23 @@ export function ChartModal({ instrumentKey, symbol, name, onClose }: Props) {
           <div className="chart-title">
             <span className="chart-symbol">{symbol}</span>
             <span className="chart-name">{name}</span>
-            {last && (
-              <span className="chart-quote">
-                ₹{last.close.toFixed(2)}
-                {change !== null && (
-                  <span className={change >= 0 ? "pos" : "neg"}>
-                    {" "}
-                    {change >= 0 ? "+" : ""}
-                    {change.toFixed(2)}%
-                  </span>
-                )}
-              </span>
-            )}
           </div>
           <div className="row" style={{ gap: 8 }}>
-            <div className="chart-intervals">
-              {INTERVALS.map((iv) => (
-                <button
-                  key={iv.value}
-                  className={`chart-iv ${interval === iv.value ? "active" : ""}`}
-                  onClick={() => setInterval(iv.value)}
-                >
-                  {iv.label}
-                </button>
-              ))}
-            </div>
+            <a
+              className="chart-newtab"
+              href={tvUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open in new tab ↗
+            </a>
             <button className="ghost chart-close" onClick={onClose}>
               ✕
             </button>
           </div>
         </div>
-
         <div className="chart-body">
-          {error ? (
-            <div className="error">{error}</div>
-          ) : loading && candles.length === 0 ? (
-            <p className="muted">Loading chart…</p>
-          ) : candles.length === 0 ? (
-            <p className="muted">No candle data available.</p>
-          ) : (
-            <StockChart candles={candles} />
-          )}
+          <div id={containerId} ref={containerRef} className="tv-container" />
         </div>
       </div>
     </div>

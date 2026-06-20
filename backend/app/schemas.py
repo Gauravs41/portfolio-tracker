@@ -148,22 +148,6 @@ class HoldingsPerformanceResponse(BaseModel):
     rows: list[HoldingPerformanceRow] = []
 
 
-# ---- Candles (OHLCV for charts) ----
-class Candle(BaseModel):
-    time: str  # ISO date "YYYY-MM-DD" (lightweight-charts business-day format)
-    open: float
-    high: float
-    low: float
-    close: float
-    volume: float = 0
-
-
-class CandlesResponse(BaseModel):
-    instrument_key: str
-    interval: str  # day | week | month
-    candles: list[Candle] = []
-
-
 # ---- Diversification ----
 class DiversificationSlice(BaseModel):
     label: str
