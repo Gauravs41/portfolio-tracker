@@ -3,8 +3,9 @@ import Dashboard from "./pages/Dashboard";
 import Watchlists from "./pages/Watchlists";
 import Holdings from "./pages/Holdings";
 import Diversification from "./pages/Diversification";
+import ChartPage from "./pages/ChartPage";
 
-export default function App() {
+function Shell() {
   return (
     <div className="layout">
       <nav className="sidebar">
@@ -24,5 +25,15 @@ export default function App() {
         </Routes>
       </main>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <Routes>
+      {/* Full-bleed chart route (opened in a new tab) — no sidebar. */}
+      <Route path="/chart/:instrumentKey" element={<ChartPage />} />
+      <Route path="/*" element={<Shell />} />
+    </Routes>
   );
 }

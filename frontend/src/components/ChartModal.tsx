@@ -1,13 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../api/client";
-import type { Candle, RsiInterval } from "../types";
-import { StockChart } from "./StockChart";
-
-const INTERVALS: { value: RsiInterval; label: string }[] = [
-  { value: "day", label: "1D" },
-  { value: "week", label: "1W" },
-  { value: "month", label: "1M" },
-];
+import { ChartView } from "./ChartView";
 
 interface Props {
   instrumentKey: string;
@@ -17,68 +9,43 @@ interface Props {
 }
 
 export function ChartModal({ instrumentKey, symbol, name, onClose }: Props) {
-  const [interval, setInterval] = useState<RsiInterval>("day");
-  const [candles, setCandles] = useState<Candle[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [full, setFull] = useState(false);
 
   useEffect(() => {
-    let alive = true;
-    setLoading(true);
-    setError("");
-    api
-      .candles(instrumentKey, interval)
-      .then((r) => alive && setCandles(r.candles))
-      .catch((e) => alive && setError(String(e)))
-      .finally(() => alive && setLoading(false));
-    return () => {
-      alive = false;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (full) setFull(false);
+        else onClose();
+      }
     };
-  }, [instrumentKey, interval]);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, full]);
 
-  const last = candles.length ? candles[candles.length - 1] : undefined;
-  const prev = candles.length > 1 ? candles[candles.length - 2] : undefined;
-  const change =
-    last && prev && prev.close ? ((last.close - prev.close) / prev.close) * 100 : null;
+  const newTabHref =
+    `/chart/${encodeURIComponent(instrumentKey)}` +
+    `?symbol=${encodeURIComponent(symbol)}&name=${encodeURIComponent(name)}`;
 
   return (
     <div className="chart-overlay" onMouseDown={onClose}>
-      <div className="chart-modal" onMouseDown={(e) => e.stopPropagation()}>
+      <div
+        className={`chart-modal ${full ? "full" : ""}`}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <div className="chart-head">
-          <div className="chart-title">
-            <span className="chart-symbol">{symbol}</span>
-            <span className="chart-name">{name}</span>
-            {last && (
-              <span className="chart-quote">
-                ₹{last.close.toFixed(2)}
-                {change !== null && (
-                  <span className={change >= 0 ? "pos" : "neg"}>
-                    {" "}
-                    {change >= 0 ? "+" : ""}
-                    {change.toFixed(2)}%
-                  </span>
-                )}
-              </span>
-            )}
-          </div>
+          <span className="chart-head-label">Chart</span>
           <div className="row" style={{ gap: 8 }}>
-            <div className="chart-intervals">
-              {INTERVALS.map((iv) => (
-                <button
-                  key={iv.value}
-                  className={`chart-iv ${interval === iv.value ? "active" : ""}`}
-                  onClick={() => setInterval(iv.value)}
-                >
-                  {iv.label}
-                </button>
-              ))}
-            </div>
+            <a
+              className="ghost chart-link"
+              href={newTabHref}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              New tab ↗
+            </a>
+            <button className="ghost" onClick={() => setFull((f) => !f)}>
+              {full ? "Exit full screen" : "Full screen"}
+            </button>
             <button className="ghost chart-close" onClick={onClose}>
               ✕
             </button>
@@ -86,15 +53,7 @@ export function ChartModal({ instrumentKey, symbol, name, onClose }: Props) {
         </div>
 
         <div className="chart-body">
-          {error ? (
-            <div className="error">{error}</div>
-          ) : loading && candles.length === 0 ? (
-            <p className="muted">Loading chart…</p>
-          ) : candles.length === 0 ? (
-            <p className="muted">No candle data available.</p>
-          ) : (
-            <StockChart candles={candles} />
-          )}
+          <ChartView instrumentKey={instrumentKey} symbol={symbol} name={name} />
         </div>
       </div>
     </div>

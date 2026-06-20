@@ -18,7 +18,9 @@ def get_candles(
 ):
     """Return OHLCV candles (oldest -> newest) for a chart."""
     try:
-        raw = upstox.get_period_candles(instrument_key, interval)
+        raw = upstox.get_period_candles(
+            instrument_key, interval, lookback_days=upstox.CHART_INTERVALS[interval]
+        )
     except UpstoxError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 

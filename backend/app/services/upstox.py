@@ -52,8 +52,8 @@ class _Cache:
     instruments: list[dict] | None = None
     instruments_loaded_at: float = 0.0
     fundamentals: dict[str, tuple[float, dict]] = field(default_factory=dict)
-    # Historical candles keyed by (instrument_key, interval) -> (ts, candles).
-    candles: dict[tuple[str, str], tuple[float, list[list]]] = field(default_factory=dict)
+    # Historical candles keyed by (instrument_key, interval, lookback_days).
+    candles: dict[tuple[str, str, int], tuple[float, list[list]]] = field(default_factory=dict)
 
 
 _cache = _Cache(ttl=get_settings().quote_cache_ttl)
@@ -65,11 +65,21 @@ FUNDAMENTALS_TTL = 6 * 3600
 CANDLES_TTL = 3600
 
 # Supported candle intervals and how far back to look (calendar days) so we get
-# enough completed bars to compute RSI(14) + SMA(50).
+# enough completed bars to compute RSI(14) + SMA(50). Kept small so the
+# performance endpoint stays light (it fetches these for every row).
 CANDLE_INTERVALS = {
     "day": 90,
     "week": 800,
     "month": 2600,
+}
+
+# Deeper history used by the interactive chart so there's plenty to scroll
+# through (calendar days). Fetched on demand, cached separately from the
+# performance lookback above.
+CHART_INTERVALS = {
+    "day": 1095,    # ~3 years
+    "week": 3650,   # ~10 years
+    "month": 9125,  # ~25 years
 }
 
 
@@ -211,21 +221,25 @@ def get_ltp(instrument_keys: list[str]) -> dict[str, dict]:
 # Historical candles
 # ---------------------------------------------------------------------------
 
-def get_period_candles(instrument_key: str, interval: str = "day") -> list[list]:
+def get_period_candles(
+    instrument_key: str, interval: str = "day", lookback_days: int | None = None
+) -> list[list]:
     """Return candles for an interval (day/week/month), oldest -> newest.
 
-    Cached per (instrument_key, interval) for CANDLES_TTL. Empty list on failure
-    of an unknown interval; network errors raise UpstoxError.
+    ``lookback_days`` overrides the default per-interval window (used by the
+    chart to pull deeper history). Cached per (instrument_key, interval, days)
+    for CANDLES_TTL; network errors raise UpstoxError.
     """
     interval = interval if interval in CANDLE_INTERVALS else "day"
-    cache_key = (instrument_key, interval)
+    days = lookback_days or CANDLE_INTERVALS[interval]
+    cache_key = (instrument_key, interval, days)
     now = time.time()
     cached = _cache.candles.get(cache_key)
     if cached and (now - cached[0]) < CANDLES_TTL:
         return cached[1]
 
     to_date = date.today()
-    from_date = to_date - timedelta(days=CANDLE_INTERVALS[interval])
+    from_date = to_date - timedelta(days=days)
     url = (
         f"{API_BASE}/historical-candle/{instrument_key}/{interval}/"
         f"{to_date.isoformat()}/{from_date.isoformat()}"
