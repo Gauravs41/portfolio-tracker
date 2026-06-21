@@ -20,9 +20,20 @@ const ICONS: Record<string, ReactElement> = {
       <path stroke="currentColor" strokeWidth="2" d="M3 12h18" />
     </svg>
   ),
+  vline: (
+    <svg viewBox="0 0 24 24" width="18" height="18">
+      <path stroke="currentColor" strokeWidth="2" d="M12 3v18" />
+    </svg>
+  ),
   trend: (
     <svg viewBox="0 0 24 24" width="18" height="18">
       <path stroke="currentColor" strokeWidth="2" fill="none" d="M4 18L20 6" />
+    </svg>
+  ),
+  ray: (
+    <svg viewBox="0 0 24 24" width="18" height="18">
+      <path stroke="currentColor" strokeWidth="2" fill="none" d="M4 18L20 6" />
+      <circle cx="4" cy="18" r="2" fill="currentColor" />
     </svg>
   ),
   rect: (
@@ -41,14 +52,28 @@ const ICONS: Record<string, ReactElement> = {
       <path stroke="currentColor" strokeWidth="1.2" d="M8 12l1 1M11 9l1 1" />
     </svg>
   ),
+  brush: (
+    <svg viewBox="0 0 24 24" width="18" height="18">
+      <path stroke="currentColor" strokeWidth="1.8" fill="none" d="M4 20c3 0 4-2 4-4M8 16c4-1 8-5 11-12" />
+    </svg>
+  ),
+  text: (
+    <svg viewBox="0 0 24 24" width="18" height="18">
+      <path stroke="currentColor" strokeWidth="2" fill="none" d="M5 6h14M12 6v13" />
+    </svg>
+  ),
 };
 
 const TOOLS: { tool: Tool; label: string }[] = [
   { tool: "cursor", label: "Cursor" },
-  { tool: "hline", label: "Horizontal line" },
   { tool: "trend", label: "Trend line" },
+  { tool: "ray", label: "Ray" },
+  { tool: "hline", label: "Horizontal line" },
+  { tool: "vline", label: "Vertical line" },
   { tool: "rect", label: "Rectangle" },
   { tool: "fib", label: "Fib retracement" },
+  { tool: "brush", label: "Brush (freehand)" },
+  { tool: "text", label: "Text label" },
   { tool: "measure", label: "Measure" },
 ];
 

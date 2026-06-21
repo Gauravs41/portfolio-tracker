@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { IChartApi, ISeriesApi, Time } from "lightweight-charts";
-import type { ChartDrawing, DrawingType } from "../types";
-import { POINTS_NEEDED, ScreenMapper, drawShape } from "../lib/drawings";
+import type { ChartDrawing, DrawingPoint, DrawingType } from "../types";
+import { SINGLE_CLICK, ScreenMapper, drawShape } from "../lib/drawings";
 
 export type Tool = DrawingType | "cursor";
 
@@ -10,6 +10,7 @@ interface Props {
   series: ISeriesApi<"Candlestick">;
   tool: Tool;
   color: string;
+  times: string[];
   drawings: ChartDrawing[];
   onChange: (drawings: ChartDrawing[]) => void;
   onToolDone: () => void;
@@ -21,7 +22,6 @@ function timeToStr(t: Time | null): string | null {
   if (t == null) return null;
   if (typeof t === "string") return t;
   if (typeof t === "number") return new Date(t * 1000).toISOString().slice(0, 10);
-  // BusinessDay object
   const b = t as { year: number; month: number; day: number };
   const mm = String(b.month).padStart(2, "0");
   const dd = String(b.day).padStart(2, "0");
@@ -34,13 +34,17 @@ export function DrawingOverlay({
   series,
   tool,
   color,
+  times,
   drawings,
   onChange,
   onToolDone,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const pendingRef = useRef<{ time: string; price: number }[]>([]);
-  const hoverRef = useRef<{ time: string; price: number } | null>(null);
+  const draggingRef = useRef(false);
+  const anchorRef = useRef<DrawingPoint | null>(null);
+  const hoverRef = useRef<DrawingPoint | null>(null);
+  const downXYRef = useRef<{ x: number; y: number } | null>(null);
+  const brushRef = useRef<DrawingPoint[]>([]);
   const measureRef = useRef<ChartDrawing | null>(null);
   const renderRef = useRef<() => void>(() => {});
 
@@ -68,23 +72,22 @@ export function DrawingOverlay({
     ctx.clearRect(0, 0, w, h);
 
     const m = mapper();
-    for (const d of drawings) drawShape(ctx, d, m, w);
-    if (measureRef.current) drawShape(ctx, measureRef.current, m, w);
+    for (const d of drawings) drawShape(ctx, d, m, w, h);
+    if (measureRef.current) drawShape(ctx, measureRef.current, m, w, h);
 
-    // Live preview of the in-progress drawing.
-    const pending = pendingRef.current;
-    if (tool !== "cursor" && (pending.length > 0 || hoverRef.current)) {
-      const pts = hoverRef.current ? [...pending, hoverRef.current] : pending;
-      if (pts.length) {
-        drawShape(
-          ctx,
-          { id: "preview", type: tool, points: pts, color },
-          m,
-          w,
-        );
+    // Live preview of the in-progress drawing (drag or freehand).
+    if (tool !== "cursor") {
+      let pts: DrawingPoint[] | null = null;
+      if (tool === "brush" && brushRef.current.length) {
+        pts = brushRef.current;
+      } else if (anchorRef.current && hoverRef.current) {
+        pts = [anchorRef.current, hoverRef.current];
+      }
+      if (pts && pts.length) {
+        drawShape(ctx, { id: "preview", type: tool, points: pts, color }, m, w, h);
       }
     }
-  }, [chart, series, tool, color, drawings, mapper]);
+  }, [tool, color, drawings, mapper]);
 
   // Keep latest render available to chart subscriptions.
   renderRef.current = render;
@@ -109,50 +112,118 @@ export function DrawingOverlay({
 
   // Reset in-progress state when the active tool changes.
   useEffect(() => {
-    pendingRef.current = [];
+    draggingRef.current = false;
+    anchorRef.current = null;
+    hoverRef.current = null;
+    brushRef.current = [];
     if (tool !== "measure") measureRef.current = null;
     render();
   }, [tool]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const eventPoint = (e: React.MouseEvent) => {
+  // Map a mouse event to a {time, price}, clamping to the nearest bar at edges.
+  const pointAt = (e: React.MouseEvent): DrawingPoint | null => {
     const canvas = canvasRef.current!;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    const time = timeToStr(chart.timeScale().coordinateToTime(x));
     const price = series.coordinateToPrice(y);
-    if (time == null || price == null) return null;
+    if (price == null) return null;
+    let time = timeToStr(chart.timeScale().coordinateToTime(x));
+    if (time == null && times.length) {
+      // Past the last bar / before the first: clamp to an edge bar so the
+      // drawing still anchors to data and survives interval switches.
+      time = x <= 0 ? times[0] : times[times.length - 1];
+    }
+    if (time == null) return null;
     return { time, price: Number(price) };
   };
 
-  const onClick = (e: React.MouseEvent) => {
+  const commit = (d: Omit<ChartDrawing, "id" | "color">) => {
+    onChange([...drawings, { id: uid(), color, ...d }]);
+    onToolDone();
+  };
+
+  const onDown = (e: React.MouseEvent) => {
     if (tool === "cursor") return;
-    const p = eventPoint(e);
+    const p = pointAt(e);
     if (!p) return;
-    const next = [...pendingRef.current, p];
-    if (next.length >= POINTS_NEEDED[tool]) {
-      const d: ChartDrawing = { id: uid(), type: tool, points: next, color };
-      pendingRef.current = [];
-      if (tool === "measure") {
-        measureRef.current = d;
-        render();
+    downXYRef.current = { x: e.clientX, y: e.clientY };
+
+    if (SINGLE_CLICK.has(tool)) {
+      if (tool === "text") {
+        const txt = window.prompt("Text label:");
+        if (txt) commit({ type: "text", points: [p], text: txt });
       } else {
-        onChange([...drawings, d]);
-        onToolDone();
+        // hline (price only) / vline (time only) place on a single click.
+        commit({ type: tool, points: [p] });
       }
-    } else {
-      pendingRef.current = next;
-      render();
+      return;
     }
+
+    draggingRef.current = true;
+    if (tool === "brush") {
+      brushRef.current = [p];
+    } else {
+      anchorRef.current = p;
+      hoverRef.current = p;
+    }
+    render();
   };
 
   const onMove = (e: React.MouseEvent) => {
     if (tool === "cursor") return;
-    hoverRef.current = eventPoint(e);
+    const p = pointAt(e);
+    if (!p) return;
+    hoverRef.current = p;
+    if (draggingRef.current && tool === "brush") brushRef.current.push(p);
     render();
   };
 
+  const moved = (e: React.MouseEvent) => {
+    const d = downXYRef.current;
+    if (!d) return true;
+    return Math.hypot(e.clientX - d.x, e.clientY - d.y) >= 4;
+  };
+
+  const onUp = (e: React.MouseEvent) => {
+    if (tool === "cursor" || !draggingRef.current) return;
+    draggingRef.current = false;
+
+    if (tool === "brush") {
+      const pts = brushRef.current;
+      brushRef.current = [];
+      if (pts.length >= 2) commit({ type: "brush", points: pts });
+      else render();
+      return;
+    }
+
+    const a = anchorRef.current;
+    const b = pointAt(e) ?? hoverRef.current;
+    anchorRef.current = null;
+    // Treat a non-drag (tiny movement) as an accidental click → cancel.
+    if (!a || !b || !moved(e)) {
+      render();
+      return;
+    }
+    if (tool === "measure") {
+      measureRef.current = { id: uid(), type: "measure", points: [a, b], color };
+      render();
+    } else {
+      commit({ type: tool, points: [a, b] });
+    }
+  };
+
   const onLeave = () => {
+    if (draggingRef.current && tool === "brush" && brushRef.current.length >= 2) {
+      const pts = brushRef.current;
+      brushRef.current = [];
+      draggingRef.current = false;
+      commit({ type: "brush", points: pts });
+      return;
+    }
+    draggingRef.current = false;
+    anchorRef.current = null;
+    brushRef.current = [];
     hoverRef.current = null;
     render();
   };
@@ -162,8 +233,9 @@ export function DrawingOverlay({
       ref={canvasRef}
       className="drawing-overlay"
       style={{ pointerEvents: tool === "cursor" ? "none" : "auto", cursor: "crosshair" }}
-      onClick={onClick}
+      onMouseDown={onDown}
       onMouseMove={onMove}
+      onMouseUp={onUp}
       onMouseLeave={onLeave}
     />
   );

@@ -11,11 +11,22 @@ export const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
 /** How many clicked points each tool needs before it is complete. */
 export const POINTS_NEEDED: Record<DrawingType, number> = {
   hline: 1,
+  vline: 1,
+  text: 1,
   trend: 2,
+  ray: 2,
   rect: 2,
   fib: 2,
   measure: 2,
+  brush: 0, // freehand: finalized on pointer-up
 };
+
+/** Tools placed with a single click rather than a click-drag. */
+export const SINGLE_CLICK: ReadonlySet<DrawingType> = new Set([
+  "hline",
+  "vline",
+  "text",
+]);
 
 export const DEFAULT_COLOR = "#4c8dff";
 
@@ -40,12 +51,22 @@ function tag(ctx: CanvasRenderingContext2D, x: number, y: number, text: string, 
   ctx.restore();
 }
 
+function dot(ctx: CanvasRenderingContext2D, x: number, y: number, color: string) {
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 /** Render a single drawing onto the overlay canvas context. */
 export function drawShape(
   ctx: CanvasRenderingContext2D,
   d: ChartDrawing,
   m: ScreenMapper,
   width: number,
+  height: number,
 ) {
   const pts = map(d, m);
   ctx.save();
@@ -65,6 +86,16 @@ export function drawShape(
       break;
     }
 
+    case "vline": {
+      const x = pts[0]?.x;
+      if (x == null) break;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, height);
+      ctx.stroke();
+      break;
+    }
+
     case "trend": {
       const [a, b] = pts;
       if (a?.x == null || a.y == null || b?.x == null || b.y == null) break;
@@ -74,6 +105,24 @@ export function drawShape(
       ctx.stroke();
       dot(ctx, a.x, a.y, d.color);
       dot(ctx, b.x, b.y, d.color);
+      break;
+    }
+
+    case "ray": {
+      const [a, b] = pts;
+      if (a?.x == null || a.y == null || b?.x == null || b.y == null) break;
+      // Extend the A→B direction to the canvas edge.
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const far = (width + height) * 2;
+      const ex = a.x + (dx / len) * far;
+      const ey = a.y + (dy / len) * far;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+      dot(ctx, a.x, a.y, d.color);
       break;
     }
 
@@ -115,6 +164,32 @@ export function drawShape(
       break;
     }
 
+    case "brush": {
+      ctx.beginPath();
+      let started = false;
+      for (const p of pts) {
+        if (p.x == null || p.y == null) continue;
+        if (!started) {
+          ctx.moveTo(p.x, p.y);
+          started = true;
+        } else {
+          ctx.lineTo(p.x, p.y);
+        }
+      }
+      if (started) ctx.stroke();
+      break;
+    }
+
+    case "text": {
+      const p = pts[0];
+      if (p?.x == null || p.y == null) break;
+      ctx.font = "13px -apple-system, system-ui, sans-serif";
+      ctx.textBaseline = "top";
+      ctx.fillStyle = d.color;
+      ctx.fillText(d.text ?? "", p.x, p.y);
+      break;
+    }
+
     case "measure": {
       const [a, b] = pts;
       if (a?.x == null || a.y == null || b?.x == null || b.y == null) break;
@@ -138,14 +213,5 @@ export function drawShape(
       break;
     }
   }
-  ctx.restore();
-}
-
-function dot(ctx: CanvasRenderingContext2D, x: number, y: number, color: string) {
-  ctx.save();
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.arc(x, y, 3, 0, Math.PI * 2);
-  ctx.fill();
   ctx.restore();
 }

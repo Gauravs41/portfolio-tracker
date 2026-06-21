@@ -132,7 +132,16 @@ export interface Diversification {
 }
 
 // ---- Chart drawings ----
-export type DrawingType = "hline" | "trend" | "rect" | "fib" | "measure";
+export type DrawingType =
+  | "hline"
+  | "vline"
+  | "trend"
+  | "ray"
+  | "rect"
+  | "fib"
+  | "brush"
+  | "text"
+  | "measure";
 
 export interface DrawingPoint {
   time: string; // bar time "YYYY-MM-DD"
@@ -144,6 +153,7 @@ export interface ChartDrawing {
   type: DrawingType;
   points: DrawingPoint[];
   color: string;
+  text?: string;
 }
 
 export interface ChartDrawingsResponse {

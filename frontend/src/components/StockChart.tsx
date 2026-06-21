@@ -247,6 +247,7 @@ export function StockChart({
           series={priceRef.current}
           tool={tool}
           color={drawingColor}
+          times={candles.map((c) => c.time)}
           drawings={drawings}
           onChange={onDrawingsChange}
           onToolDone={onToolDone ?? (() => {})}
