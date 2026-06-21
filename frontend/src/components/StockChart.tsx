@@ -91,7 +91,8 @@ export function StockChart({
     if (!el) return;
 
     const chart = createChart(el, {
-      autoSize: true,
+      width: el.clientWidth,
+      height: el.clientHeight,
       layout: {
         background: { type: ColorType.Solid, color: "#0f1115" },
         textColor: "#d1d4dc",
@@ -146,6 +147,18 @@ export function StockChart({
     );
     chart.panes()[1]?.setHeight(120);
 
+    // Manual, clamped sizing (instead of autoSize) so a layout glitch can never
+    // grow the canvas past the browser's max size — which is what made the chart
+    // blank out to a white area with a broken-image icon after a few seconds.
+    const resize = () => {
+      const w = Math.min(el.clientWidth, 6000);
+      const h = Math.min(el.clientHeight, 6000);
+      if (w > 0 && h > 0) chart.resize(w, h);
+    };
+    resize();
+    const ro = new ResizeObserver(resize);
+    ro.observe(el);
+
     chartRef.current = chart;
     priceRef.current = price;
     volRef.current = vol;
@@ -153,6 +166,7 @@ export function StockChart({
     setReady(true);
 
     return () => {
+      ro.disconnect();
       chart.remove();
       setReady(false);
       chartRef.current = null;
