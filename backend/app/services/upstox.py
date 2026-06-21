@@ -79,7 +79,7 @@ CANDLE_INTERVALS = {
 CHART_INTERVALS = {
     "day": 1095,    # ~3 years
     "week": 3650,   # ~10 years
-    "month": 9125,  # ~25 years
+    "month": 3650,  # ~10 years (Upstox rejects month ranges beyond ~a decade)
 }
 
 

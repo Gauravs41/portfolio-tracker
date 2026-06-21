@@ -121,7 +121,7 @@ export function DrawingOverlay({
   }, [tool]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Map a mouse event to a {time, price}, clamping to the nearest bar at edges.
-  const pointAt = (e: React.MouseEvent): DrawingPoint | null => {
+  const pointAt = (e: React.PointerEvent): DrawingPoint | null => {
     const canvas = canvasRef.current!;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -143,10 +143,12 @@ export function DrawingOverlay({
     onToolDone();
   };
 
-  const onDown = (e: React.MouseEvent) => {
+  const onDown = (e: React.PointerEvent) => {
     if (tool === "cursor") return;
     const p = pointAt(e);
     if (!p) return;
+    // Capture the pointer so a drag still finalizes if it leaves the canvas.
+    canvasRef.current?.setPointerCapture(e.pointerId);
     downXYRef.current = { x: e.clientX, y: e.clientY };
 
     if (SINGLE_CLICK.has(tool)) {
@@ -170,7 +172,7 @@ export function DrawingOverlay({
     render();
   };
 
-  const onMove = (e: React.MouseEvent) => {
+  const onMove = (e: React.PointerEvent) => {
     if (tool === "cursor") return;
     const p = pointAt(e);
     if (!p) return;
@@ -179,13 +181,14 @@ export function DrawingOverlay({
     render();
   };
 
-  const moved = (e: React.MouseEvent) => {
+  const moved = (e: React.PointerEvent) => {
     const d = downXYRef.current;
     if (!d) return true;
     return Math.hypot(e.clientX - d.x, e.clientY - d.y) >= 4;
   };
 
-  const onUp = (e: React.MouseEvent) => {
+  const onUp = (e: React.PointerEvent) => {
+    canvasRef.current?.releasePointerCapture?.(e.pointerId);
     if (tool === "cursor" || !draggingRef.current) return;
     draggingRef.current = false;
 
@@ -214,16 +217,9 @@ export function DrawingOverlay({
   };
 
   const onLeave = () => {
-    if (draggingRef.current && tool === "brush" && brushRef.current.length >= 2) {
-      const pts = brushRef.current;
-      brushRef.current = [];
-      draggingRef.current = false;
-      commit({ type: "brush", points: pts });
-      return;
-    }
-    draggingRef.current = false;
-    anchorRef.current = null;
-    brushRef.current = [];
+    // With pointer capture, an active drag keeps receiving events, so only
+    // clear the hover preview here (don't cancel an in-progress drag).
+    if (draggingRef.current) return;
     hoverRef.current = null;
     render();
   };
@@ -233,10 +229,10 @@ export function DrawingOverlay({
       ref={canvasRef}
       className="drawing-overlay"
       style={{ pointerEvents: tool === "cursor" ? "none" : "auto", cursor: "crosshair" }}
-      onMouseDown={onDown}
-      onMouseMove={onMove}
-      onMouseUp={onUp}
-      onMouseLeave={onLeave}
+      onPointerDown={onDown}
+      onPointerMove={onMove}
+      onPointerUp={onUp}
+      onPointerLeave={onLeave}
     />
   );
 }
