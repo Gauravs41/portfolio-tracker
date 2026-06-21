@@ -64,6 +64,9 @@ export function DrawingOverlay({
     const dpr = window.devicePixelRatio || 1;
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
+    // Skip while the overlay has no box (e.g. mid-layout) so we never allocate a
+    // zero- or over-large backing store, which Chrome renders as a broken image.
+    if (w <= 0 || h <= 0) return;
     if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
       canvas.width = w * dpr;
       canvas.height = h * dpr;

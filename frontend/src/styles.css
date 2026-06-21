@@ -388,7 +388,10 @@ tr.filter-row th { padding-top: 0; padding-bottom: 8px; border-bottom: 1px solid
   overflow: hidden;
   padding: 4px 8px 8px;
 }
-.stock-chart { width: 100%; height: 100%; }
+/* Absolutely positioned so the chart's own canvases never feed back into the
+   flex layout (prevents the autoSize growth loop that grew the canvas until it
+   exceeded the browser's max size and rendered as a broken image). */
+.stock-chart { position: absolute; inset: 0; }
 
 /* ---- Chart main row: drawing rail + canvas ---- */
 .chart-main {
@@ -506,6 +509,22 @@ tr.filter-row th { padding-top: 0; padding-bottom: 8px; border-bottom: 1px solid
   overflow: auto;
 }
 
+/* Drag handle on the panel's left edge to resize it horizontally. */
+.chart-watch-resize {
+  position: absolute;
+  top: 0;
+  left: -3px;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 3;
+  touch-action: none;
+}
+.chart-watch-resize:hover {
+  background: var(--accent);
+  opacity: 0.4;
+}
+
 /* Watchlist quote table (configurable columns) */
 .watch-table {
   width: 100%;
@@ -531,6 +550,11 @@ tr.filter-row th { padding-top: 0; padding-bottom: 8px; border-bottom: 1px solid
 .watch-table td:first-child {
   text-align: left;
 }
+.watch-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+.watch-table th.sortable:hover { color: var(--text); }
 .watch-row { cursor: pointer; }
 .watch-row:hover { background: var(--panel-2); }
 .watch-row.active { background: var(--panel-2); box-shadow: inset 3px 0 0 var(--accent); }

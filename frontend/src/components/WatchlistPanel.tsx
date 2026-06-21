@@ -43,6 +43,16 @@ const COLUMNS: ColDef[] = [
 ];
 
 const COLS_KEY = "chart-watch-cols";
+const WIDTH_KEY = "chart-watch-width";
+
+const MIN_WIDTH = 220;
+const MAX_WIDTH = 720;
+
+type SortKey = "symbol" | ColKey;
+interface SortState {
+  key: SortKey;
+  dir: "asc" | "desc";
+}
 
 function loadCols(): ColKey[] {
   try {
@@ -54,6 +64,11 @@ function loadCols(): ColKey[] {
   return ["last_price", "change_1d"];
 }
 
+function loadWidth(): number {
+  const n = Number(localStorage.getItem(WIDTH_KEY));
+  return Number.isFinite(n) && n >= MIN_WIDTH ? Math.min(n, MAX_WIDTH) : 300;
+}
+
 /** Right-hand watchlist panel on the full-screen chart page. */
 export function WatchlistPanel({ activeKey, onPick }: Props) {
   const [watchlists, setWatchlists] = useState<Watchlist[]>([]);
@@ -62,7 +77,10 @@ export function WatchlistPanel({ activeKey, onPick }: Props) {
   const [loading, setLoading] = useState(false);
   const [cols, setCols] = useState<ColKey[]>(loadCols);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [sort, setSort] = useState<SortState | null>(null);
+  const [width, setWidth] = useState<number>(loadWidth);
   const menuRef = useRef<HTMLDivElement>(null);
+  const resizeRef = useRef<{ x: number; w: number } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -105,6 +123,10 @@ export function WatchlistPanel({ activeKey, onPick }: Props) {
   }, [cols]);
 
   useEffect(() => {
+    localStorage.setItem(WIDTH_KEY, String(width));
+  }, [width]);
+
+  useEffect(() => {
     if (!menuOpen) return;
     const onClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -120,8 +142,65 @@ export function WatchlistPanel({ activeKey, onPick }: Props) {
   const toggleCol = (k: ColKey) =>
     setCols((prev) => (prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k]));
 
+  // Cycle a column header: unsorted → ascending → descending → unsorted.
+  const toggleSort = (key: SortKey) =>
+    setSort((s) =>
+      s && s.key === key
+        ? s.dir === "asc"
+          ? { key, dir: "desc" }
+          : null
+        : { key, dir: "asc" },
+    );
+  const arrow = (key: SortKey) =>
+    sort?.key === key ? (sort.dir === "asc" ? " ▲" : " ▼") : "";
+
+  const sortValue = (it: WatchlistItem, key: SortKey): number | string | null => {
+    if (key === "symbol") return it.symbol;
+    const r = perf[it.instrument_key];
+    return r ? r[key] : null;
+  };
+
+  const items = active ? [...active.items] : [];
+  if (sort) {
+    items.sort((a, b) => {
+      const va = sortValue(a, sort.key);
+      const vb = sortValue(b, sort.key);
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1; // nulls always sink to the bottom
+      if (vb == null) return -1;
+      const cmp =
+        typeof va === "number" && typeof vb === "number"
+          ? va - vb
+          : String(va).localeCompare(String(vb));
+      return sort.dir === "asc" ? cmp : -cmp;
+    });
+  }
+
+  // Drag the left-edge handle to resize the panel (panel sits on the right, so
+  // moving left widens it). Width persists to localStorage.
+  const onResizeDown = (e: React.PointerEvent) => {
+    resizeRef.current = { x: e.clientX, w: width };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onResizeMove = (e: React.PointerEvent) => {
+    const st = resizeRef.current;
+    if (!st) return;
+    const next = st.w + (st.x - e.clientX);
+    setWidth(Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, next)));
+  };
+  const onResizeUp = (e: React.PointerEvent) => {
+    resizeRef.current = null;
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
+  };
+
   return (
-    <aside className="chart-watch">
+    <aside className="chart-watch" style={{ width }}>
+      <div
+        className="chart-watch-resize"
+        onPointerDown={onResizeDown}
+        onPointerMove={onResizeMove}
+        onPointerUp={onResizeUp}
+      />
       <div className="chart-watch-head">
         <span>Watchlist</span>
         <div className="row" style={{ gap: 6 }}>
@@ -171,14 +250,23 @@ export function WatchlistPanel({ activeKey, onPick }: Props) {
           <table className="watch-table">
             <thead>
               <tr>
-                <th>Symbol</th>
+                <th className="sortable" onClick={() => toggleSort("symbol")}>
+                  Symbol{arrow("symbol")}
+                </th>
                 {visible.map((c) => (
-                  <th key={c.key}>{c.label}</th>
+                  <th
+                    key={c.key}
+                    className="sortable"
+                    onClick={() => toggleSort(c.key)}
+                  >
+                    {c.label}
+                    {arrow(c.key)}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {active.items.map((it) => {
+              {items.map((it) => {
                 const r = perf[it.instrument_key];
                 return (
                   <tr
