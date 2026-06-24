@@ -1,9 +1,11 @@
-import type { ChartDrawing, DrawingType } from "../types";
+import type { ChartDrawing, DrawingPoint, DrawingType } from "../types";
 
-/** Maps data values (bar time / price) to pixel coordinates on the overlay. */
+/** Maps a drawing point (logical bar index / price) to overlay pixels. */
 export interface ScreenMapper {
-  toX: (time: string) => number | null;
+  toX: (p: DrawingPoint) => number | null;
   toY: (price: number) => number | null;
+  /** Bar index of a point, for span measurements. null if off the scale. */
+  idxOf: (p: DrawingPoint) => number | null;
 }
 
 export const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
@@ -37,7 +39,7 @@ interface Pt {
 }
 
 const map = (d: ChartDrawing, m: ScreenMapper): Pt[] =>
-  d.points.map((p) => ({ x: m.toX(p.time), y: m.toY(p.price), price: p.price }));
+  d.points.map((p) => ({ x: m.toX(p), y: m.toY(p.price), price: p.price }));
 
 function tag(ctx: CanvasRenderingContext2D, x: number, y: number, text: string, color: string) {
   ctx.save();
@@ -208,7 +210,11 @@ export function drawShape(
       ctx.setLineDash([]);
       const diff = b.price - a.price;
       const pct = a.price ? (diff / a.price) * 100 : 0;
-      const label = `${diff >= 0 ? "+" : ""}${diff.toFixed(2)} (${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%)`;
+      const ia = m.idxOf(d.points[0]);
+      const ib = m.idxOf(d.points[1]);
+      const bars = ia != null && ib != null ? Math.abs(ib - ia) : null;
+      const span = bars != null ? `, ${bars} bar${bars === 1 ? "" : "s"}` : "";
+      const label = `${diff >= 0 ? "+" : ""}${diff.toFixed(2)} (${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%)${span}`;
       tag(ctx, x + w / 2 - 40, y - 2, label, up ? "#26a69a" : "#ef5350");
       break;
     }

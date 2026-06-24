@@ -144,7 +144,13 @@ export type DrawingType =
   | "measure";
 
 export interface DrawingPoint {
-  time: string; // bar time "YYYY-MM-DD"
+  /**
+   * Fractional logical bar index on the time scale — the primary X anchor.
+   * Stored as a float so a point sits exactly where it was placed (including
+   * between bars or in the future whitespace) and stays glued on pan/zoom.
+   */
+  logical?: number;
+  time?: string; // bar time "YYYY-MM-DD" (snapped reference / legacy points)
   price: number;
 }
 

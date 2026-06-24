@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef } from "react";
-import type { IChartApi, ISeriesApi, Time } from "lightweight-charts";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import type { IChartApi, ISeriesApi, Logical, Time } from "lightweight-charts";
 import type { ChartDrawing, DrawingPoint, DrawingType } from "../types";
 import { SINGLE_CLICK, ScreenMapper, drawShape } from "../lib/drawings";
 
@@ -17,16 +17,6 @@ interface Props {
 }
 
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
-
-function timeToStr(t: Time | null): string | null {
-  if (t == null) return null;
-  if (typeof t === "string") return t;
-  if (typeof t === "number") return new Date(t * 1000).toISOString().slice(0, 10);
-  const b = t as { year: number; month: number; day: number };
-  const mm = String(b.month).padStart(2, "0");
-  const dd = String(b.day).padStart(2, "0");
-  return `${b.year}-${mm}-${dd}`;
-}
 
 /** Transparent canvas over the chart for drawing annotations. */
 export function DrawingOverlay({
@@ -48,12 +38,44 @@ export function DrawingOverlay({
   const measureRef = useRef<ChartDrawing | null>(null);
   const renderRef = useRef<() => void>(() => {});
 
+  // Map bar time <-> logical index. Anchoring drawings by logical index (rather
+  // than time) keeps them glued to the chart while panning/zooming and lets the
+  // coordinate round-trip stay exact, since logicalToCoordinate is the precise
+  // inverse of coordinateToLogical and also resolves off-screen positions.
+  const timeIndex = useMemo(() => {
+    const m = new Map<string, number>();
+    times.forEach((t, i) => m.set(t, i));
+    return m;
+  }, [times]);
+
   const mapper = useCallback(
-    (): ScreenMapper => ({
-      toX: (time) => chart.timeScale().timeToCoordinate(time as Time),
-      toY: (price) => series.priceToCoordinate(price),
-    }),
-    [chart, series],
+    (): ScreenMapper => {
+      const ts = chart.timeScale();
+      // Resolve a point's logical bar index: prefer the stored float; fall back
+      // to the snapped time (legacy points saved before logical anchoring).
+      const logicalOf = (p: DrawingPoint): number | null => {
+        if (p.logical != null) return p.logical;
+        if (p.time != null) {
+          const i = timeIndex.get(p.time);
+          if (i != null) return i;
+        }
+        return null;
+      };
+      return {
+        toX: (p) => {
+          const l = logicalOf(p);
+          if (l != null) return ts.logicalToCoordinate(l as Logical);
+          // Time not on the current scale (e.g. interval switch): best effort.
+          return p.time != null ? ts.timeToCoordinate(p.time as Time) : null;
+        },
+        toY: (price) => series.priceToCoordinate(price),
+        idxOf: (p) => {
+          const l = logicalOf(p);
+          return l == null ? null : Math.round(l);
+        },
+      };
+    },
+    [chart, series, timeIndex],
   );
 
   const render = useCallback(() => {
@@ -64,17 +86,20 @@ export function DrawingOverlay({
     const dpr = window.devicePixelRatio || 1;
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
-    // Skip while the overlay has no box (e.g. mid-layout) and clamp the backing
-    // store so we never allocate an over-large canvas, which Chrome renders as a
-    // broken image.
+    // Skip while the overlay has no box (e.g. mid-layout). Cap the backing store
+    // so we never allocate an over-large canvas (Chrome renders that as a broken
+    // image). Use one uniform scale for BOTH the backing store and the context
+    // transform so drawings are never stretched away from the pointer.
     if (w <= 0 || h <= 0) return;
-    const cw = Math.min(w * dpr, 6000);
-    const ch = Math.min(h * dpr, 6000);
+    const MAX = 6000;
+    const scale = Math.min(dpr, MAX / w, MAX / h);
+    const cw = Math.round(w * scale);
+    const ch = Math.round(h * scale);
     if (canvas.width !== cw || canvas.height !== ch) {
       canvas.width = cw;
       canvas.height = ch;
     }
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
     ctx.clearRect(0, 0, w, h);
 
     const m = mapper();
@@ -126,7 +151,10 @@ export function DrawingOverlay({
     render();
   }, [tool]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Map a mouse event to a {time, price}, clamping to the nearest bar at edges.
+  // Map a mouse event to a drawing point. X is the exact fractional logical
+  // bar index under the cursor (no snapping), so the drawing lands precisely
+  // where pointed and stays anchored on pan/zoom. `time` is kept as a snapped
+  // reference for display / legacy interop.
   const pointAt = (e: React.PointerEvent): DrawingPoint | null => {
     const canvas = canvasRef.current!;
     const rect = canvas.getBoundingClientRect();
@@ -134,14 +162,14 @@ export function DrawingOverlay({
     const y = e.clientY - rect.top;
     const price = series.coordinateToPrice(y);
     if (price == null) return null;
-    let time = timeToStr(chart.timeScale().coordinateToTime(x));
-    if (time == null && times.length) {
-      // Past the last bar / before the first: clamp to an edge bar so the
-      // drawing still anchors to data and survives interval switches.
-      time = x <= 0 ? times[0] : times[times.length - 1];
+    const logical = chart.timeScale().coordinateToLogical(x);
+    if (logical == null) return null;
+    const point: DrawingPoint = { logical, price: Number(price) };
+    if (times.length) {
+      const idx = Math.max(0, Math.min(times.length - 1, Math.round(logical)));
+      point.time = times[idx];
     }
-    if (time == null) return null;
-    return { time, price: Number(price) };
+    return point;
   };
 
   const commit = (d: Omit<ChartDrawing, "id" | "color">) => {
