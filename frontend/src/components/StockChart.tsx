@@ -14,9 +14,18 @@ import {
   type ISeriesApi,
   type LineData,
   type Time,
+  type WhitespaceData,
 } from "lightweight-charts";
 import type { Candle } from "../types";
-import { bollinger, ema, rsi, sma, type LinePoint } from "../lib/indicators";
+import {
+  bollinger,
+  ema,
+  relVolume,
+  rsi,
+  sma,
+  supertrend,
+  type LinePoint,
+} from "../lib/indicators";
 import { DrawingOverlay, type Tool } from "./DrawingOverlay";
 import type { AlertRule, ChartDrawing } from "../types";
 
@@ -27,13 +36,17 @@ const SMA50 = "#FF6D00";
 const EMA20 = "#AB47BC";
 const BB = "#787B86";
 const RSI = "#c792ea";
+const ST_UP = "#22c55e";
+const ST_DOWN = "#ef4444";
 
 export interface IndicatorState {
   sma20: boolean;
   sma50: boolean;
   ema20: boolean;
   bollinger: boolean;
+  supertrend: boolean;
   volume: boolean;
+  relVolume: boolean;
   rsi: boolean;
 }
 
@@ -42,7 +55,9 @@ export const DEFAULT_INDICATORS: IndicatorState = {
   sma50: true,
   ema20: false,
   bollinger: false,
+  supertrend: true,
   volume: true,
+  relVolume: false,
   rsi: true,
 };
 
@@ -56,6 +71,7 @@ interface Props {
   onDrawingsChange?: (drawings: ChartDrawing[]) => void;
   onToolDone?: () => void;
   alerts?: AlertRule[];
+  onAddAlert?: (drawingId: string) => void;
 }
 
 // Price-level conditions whose threshold maps to a horizontal line on the chart.
@@ -80,6 +96,7 @@ export function StockChart({
   onDrawingsChange,
   onToolDone,
   alerts = [],
+  onAddAlert,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -92,6 +109,9 @@ export function StockChart({
   const bbUpRef = useRef<ISeriesApi<"Line"> | null>(null);
   const bbMidRef = useRef<ISeriesApi<"Line"> | null>(null);
   const bbLowRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const stUpRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const stDownRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const relVolRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const rsiRef = useRef<ISeriesApi<"Line"> | null>(null);
   const rsiLinesRef = useRef<IPriceLine[]>([]);
   const alertLinesRef = useRef<IPriceLine[]>([]);
@@ -150,6 +170,11 @@ export function StockChart({
     bbMidRef.current = overlay(BB, 1, LineStyle.Dashed);
     bbLowRef.current = overlay(BB, 1);
 
+    // SuperTrend: two overlapping line series (green uptrend / red downtrend)
+    // sharing the price scale; each is whitespace where the other is active.
+    stUpRef.current = overlay(ST_UP, 2);
+    stDownRef.current = overlay(ST_DOWN, 2);
+
     // RSI on its own pane (index 1).
     const rsiSeries = chart.addSeries(
       LineSeries,
@@ -157,6 +182,14 @@ export function StockChart({
       1,
     );
     chart.panes()[1]?.setHeight(120);
+
+    // Relative volume histogram on its own pane (index 2).
+    const relVol = chart.addSeries(
+      HistogramSeries,
+      { priceFormat: { type: "volume" }, priceLineVisible: false, lastValueVisible: false },
+      2,
+    );
+    chart.panes()[2]?.setHeight(100);
 
     // Manual, clamped sizing (instead of autoSize) so a layout glitch can never
     // grow the canvas past the browser's max size — which is what made the chart
@@ -174,6 +207,7 @@ export function StockChart({
     priceRef.current = price;
     volRef.current = vol;
     rsiRef.current = rsiSeries;
+    relVolRef.current = relVol;
     setReady(true);
 
     return () => {
@@ -189,6 +223,9 @@ export function StockChart({
       bbUpRef.current = null;
       bbMidRef.current = null;
       bbLowRef.current = null;
+      stUpRef.current = null;
+      stDownRef.current = null;
+      relVolRef.current = null;
       rsiRef.current = null;
       rsiLinesRef.current = [];
     };
@@ -224,6 +261,34 @@ export function StockChart({
     bbLowRef.current?.setData(toLine(bb.lower));
     rsiRef.current?.setData(toLine(rsi(candles, 14)));
 
+    // SuperTrend: split into green (uptrend) / red (downtrend) line series.
+    // Each bar is whitespace on the inactive series so the lines break at flips;
+    // the flip bar is included in both so the segments visually connect.
+    const st = supertrend(candles, 10, 3);
+    const upData: (LineData<Time> | WhitespaceData<Time>)[] = [];
+    const downData: (LineData<Time> | WhitespaceData<Time>)[] = [];
+    for (let i = 0; i < st.length; i++) {
+      const p = st[i];
+      const t = p.time as Time;
+      const flip = i > 0 && st[i - 1].trend !== p.trend;
+      const onUp = p.trend === 1 || (flip && st[i - 1].trend === 1);
+      const onDown = p.trend === -1 || (flip && st[i - 1].trend === -1);
+      upData.push(onUp ? { time: t, value: p.value } : { time: t });
+      downData.push(onDown ? { time: t, value: p.value } : { time: t });
+    }
+    stUpRef.current?.setData(upData);
+    stDownRef.current?.setData(downData);
+
+    // Relative volume: brighter bar when at/above the average (rel >= 1).
+    const relVolData: HistogramData<Time>[] = relVolume(candles, 20).map((p) => ({
+      time: p.time as Time,
+      value: p.value,
+      color: p.up
+        ? p.value >= 1 ? "rgba(38,166,154,0.9)" : "rgba(38,166,154,0.4)"
+        : p.value >= 1 ? "rgba(239,83,80,0.9)" : "rgba(239,83,80,0.4)",
+    }));
+    relVolRef.current?.setData(relVolData);
+
     // Guide lines at 70/30 on the RSI pane.
     const rsiSeries = rsiRef.current;
     if (rsiSeries) {
@@ -255,9 +320,14 @@ export function StockChart({
     bbUpRef.current?.applyOptions({ visible: indicators.bollinger });
     bbMidRef.current?.applyOptions({ visible: indicators.bollinger });
     bbLowRef.current?.applyOptions({ visible: indicators.bollinger });
+    stUpRef.current?.applyOptions({ visible: indicators.supertrend });
+    stDownRef.current?.applyOptions({ visible: indicators.supertrend });
     volRef.current?.applyOptions({ visible: indicators.volume });
+    relVolRef.current?.applyOptions({ visible: indicators.relVolume });
     rsiRef.current?.applyOptions({ visible: indicators.rsi });
-    chartRef.current?.panes()[1]?.setHeight(indicators.rsi ? 120 : 1);
+    const panes = chartRef.current?.panes();
+    panes?.[1]?.setHeight(indicators.rsi ? 120 : 1);
+    panes?.[2]?.setHeight(indicators.relVolume ? 100 : 1);
   }, [indicators]);
 
   // Draw a dashed horizontal line for each price-level alert (TradingView-style).
@@ -297,6 +367,7 @@ export function StockChart({
           drawings={drawings}
           onChange={onDrawingsChange}
           onToolDone={onToolDone ?? (() => {})}
+          onAddAlert={onAddAlert}
         />
       )}
     </div>

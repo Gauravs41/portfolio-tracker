@@ -160,6 +160,8 @@ export interface ChartDrawing {
   points: DrawingPoint[];
   color: string;
   text?: string;
+  /** User-given label, shown on the chart and in the alert picker. */
+  name?: string;
 }
 
 export interface ChartDrawingsResponse {

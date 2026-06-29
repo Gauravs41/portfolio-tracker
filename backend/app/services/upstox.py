@@ -77,7 +77,7 @@ CANDLE_INTERVALS = {
 # through (calendar days). Fetched on demand, cached separately from the
 # performance lookback above.
 CHART_INTERVALS = {
-    "day": 1095,    # ~3 years
+    "day": 3650,    # ~10 years (was 1095/~3yr, which cut day charts off mid-2023)
     "week": 3650,   # ~10 years
     "month": 3650,  # ~10 years (Upstox rejects month ranges beyond ~a decade)
 }

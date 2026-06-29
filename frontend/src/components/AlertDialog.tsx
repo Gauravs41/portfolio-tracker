@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { api } from "../api/client";
+import { drawingLabel } from "../lib/drawings";
 import type {
   AlertCondition,
   AlertFrequency,
@@ -15,6 +16,8 @@ interface Props {
   currentPrice?: number;
   drawings: ChartDrawing[];
   editing?: AlertRule | null;
+  /** Pre-select a drawing-cross alert bound to this drawing id. */
+  initialDrawingId?: string | null;
   onClose: () => void;
   onSaved: (rule: AlertRule) => void;
 }
@@ -49,11 +52,12 @@ export function AlertDialog({
   currentPrice,
   drawings,
   editing,
+  initialDrawingId,
   onClose,
   onSaved,
 }: Props) {
   const [condition, setCondition] = useState<AlertCondition>(
-    editing?.condition ?? "price_cross_down",
+    editing?.condition ?? (initialDrawingId ? "drawing_cross" : "price_cross_down"),
   );
   const [value, setValue] = useState<string>(
     editing ? String(editing.value) : currentPrice ? currentPrice.toFixed(2) : "",
@@ -68,7 +72,7 @@ export function AlertDialog({
     editing?.params?.period ? String(editing.params.period) : "50",
   );
   const [drawingId, setDrawingId] = useState<string>(
-    editing?.drawing_id ?? "",
+    editing?.drawing_id ?? initialDrawingId ?? "",
   );
   const [message, setMessage] = useState<string>(editing?.message ?? "");
   const [saving, setSaving] = useState(false);
@@ -201,7 +205,7 @@ export function AlertDialog({
                 <option value="">Select a line…</option>
                 {lineDrawings.map((d, i) => (
                   <option key={d.id} value={d.id}>
-                    {d.type} #{i + 1}
+                    {drawingLabel(d, i)}
                   </option>
                 ))}
               </select>

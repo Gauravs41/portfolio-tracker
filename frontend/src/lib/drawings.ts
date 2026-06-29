@@ -62,6 +62,131 @@ function dot(ctx: CanvasRenderingContext2D, x: number, y: number, color: string)
   ctx.restore();
 }
 
+/** Default display label for a drawing (used on chart + in the alert picker). */
+export function drawingLabel(d: ChartDrawing, index: number): string {
+  if (d.name && d.name.trim()) return d.name.trim();
+  const pretty: Partial<Record<DrawingType, string>> = {
+    trend: "Trend",
+    ray: "Ray",
+    hline: "H-Line",
+    vline: "V-Line",
+    rect: "Rect",
+    fib: "Fib",
+    brush: "Brush",
+    text: "Text",
+    measure: "Measure",
+  };
+  return `${pretty[d.type] ?? d.type} #${index + 1}`;
+}
+
+// --- Hit-testing (for selecting / editing drawings in cursor mode) ---
+const HANDLE_R = 7; // px grab radius around an endpoint
+const LINE_TOL = 6; // px grab distance to a line/edge
+
+export interface Hit {
+  kind: "endpoint" | "body";
+  index: number; // endpoint index (or 0 for body)
+}
+
+function distToSeg(
+  px: number,
+  py: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+): number {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const len2 = dx * dx + dy * dy;
+  if (len2 === 0) return Math.hypot(px - ax, py - ay);
+  let t = ((px - ax) * dx + (py - ay) * dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+/** Return what part of a drawing is under (x, y), or null if nothing is. */
+export function hitTest(
+  d: ChartDrawing,
+  m: ScreenMapper,
+  x: number,
+  y: number,
+): Hit | null {
+  const pts = map(d, m);
+  // Endpoints take priority so they stay grabbable even on top of the body.
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    if (p.x == null || p.y == null) continue;
+    if (Math.hypot(p.x - x, p.y - y) <= HANDLE_R) return { kind: "endpoint", index: i };
+  }
+
+  switch (d.type) {
+    case "hline": {
+      const y0 = pts[0]?.y;
+      return y0 != null && Math.abs(y - y0) <= LINE_TOL ? { kind: "body", index: 0 } : null;
+    }
+    case "vline": {
+      const x0 = pts[0]?.x;
+      return x0 != null && Math.abs(x - x0) <= LINE_TOL ? { kind: "body", index: 0 } : null;
+    }
+    case "trend":
+    case "ray":
+    case "measure": {
+      const [a, b] = pts;
+      if (a?.x == null || a.y == null || b?.x == null || b.y == null) return null;
+      return distToSeg(x, y, a.x, a.y, b.x, b.y) <= LINE_TOL ? { kind: "body", index: 0 } : null;
+    }
+    case "rect":
+    case "fib": {
+      const [a, b] = pts;
+      if (a?.x == null || a.y == null || b?.x == null || b.y == null) return null;
+      const x1 = Math.min(a.x, b.x);
+      const x2 = Math.max(a.x, b.x);
+      const y1 = Math.min(a.y, b.y);
+      const y2 = Math.max(a.y, b.y);
+      const nearV = (Math.abs(x - x1) <= LINE_TOL || Math.abs(x - x2) <= LINE_TOL) &&
+        y >= y1 - LINE_TOL && y <= y2 + LINE_TOL;
+      const nearH = (Math.abs(y - y1) <= LINE_TOL || Math.abs(y - y2) <= LINE_TOL) &&
+        x >= x1 - LINE_TOL && x <= x2 + LINE_TOL;
+      return nearV || nearH ? { kind: "body", index: 0 } : null;
+    }
+    case "text": {
+      const p = pts[0];
+      if (p?.x == null || p.y == null) return null;
+      return x >= p.x - 2 && x <= p.x + 90 && y >= p.y - 4 && y <= p.y + 18
+        ? { kind: "body", index: 0 }
+        : null;
+    }
+    case "brush": {
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1];
+        const b = pts[i];
+        if (a.x == null || a.y == null || b.x == null || b.y == null) continue;
+        if (distToSeg(x, y, a.x, a.y, b.x, b.y) <= LINE_TOL) return { kind: "body", index: 0 };
+      }
+      return null;
+    }
+  }
+  return null;
+}
+
+/** Outline a selected drawing's endpoints with grab handles. */
+export function drawSelection(ctx: CanvasRenderingContext2D, d: ChartDrawing, m: ScreenMapper) {
+  const pts = map(d, m);
+  ctx.save();
+  for (const p of pts) {
+    if (p.x == null || p.y == null) continue;
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "#4c8dff";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 /** Render a single drawing onto the overlay canvas context. */
 export function drawShape(
   ctx: CanvasRenderingContext2D,
@@ -217,6 +342,17 @@ export function drawShape(
       const label = `${diff >= 0 ? "+" : ""}${diff.toFixed(2)} (${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%)${span}`;
       tag(ctx, x + w / 2 - 40, y - 2, label, up ? "#26a69a" : "#ef5350");
       break;
+    }
+  }
+
+  // User label (name/note) drawn near the drawing's first on-screen anchor.
+  if (d.name && d.name.trim() && d.type !== "text") {
+    const anchor = pts.find((p) => p.x != null && p.y != null);
+    if (anchor && anchor.x != null && anchor.y != null) {
+      ctx.font = "11px -apple-system, system-ui, sans-serif";
+      ctx.textBaseline = "bottom";
+      ctx.fillStyle = d.color;
+      ctx.fillText(d.name.trim(), anchor.x + 6, anchor.y - 6);
     }
   }
   ctx.restore();

@@ -22,7 +22,9 @@ const TOGGLES: { key: keyof IndicatorState; label: string; color: string }[] = [
   { key: "sma50", label: "SMA 50", color: "#FF6D00" },
   { key: "ema20", label: "EMA 20", color: "#AB47BC" },
   { key: "bollinger", label: "Bollinger", color: "#787B86" },
+  { key: "supertrend", label: "SuperTrend", color: "#22c55e" },
   { key: "volume", label: "Volume", color: "#26a69a" },
+  { key: "relVolume", label: "Relative Volume", color: "#26a69a" },
   { key: "rsi", label: "RSI 14", color: "#c792ea" },
 ];
 
@@ -64,6 +66,7 @@ export function ChartView({ instrumentKey, symbol, name }: Props) {
   const [showAlerts, setShowAlerts] = useState(false);
   const [alertDialog, setAlertDialog] = useState(false);
   const [editingAlert, setEditingAlert] = useState<AlertRule | null>(null);
+  const [alertDrawingId, setAlertDrawingId] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -194,6 +197,7 @@ export function ChartView({ instrumentKey, symbol, name }: Props) {
             title="Create alert"
             onClick={() => {
               setEditingAlert(null);
+              setAlertDrawingId(null);
               setAlertDialog(true);
             }}
           >
@@ -256,6 +260,11 @@ export function ChartView({ instrumentKey, symbol, name }: Props) {
               onDrawingsChange={setDrawings}
               onToolDone={() => setTool("cursor")}
               alerts={alerts}
+              onAddAlert={(drawingId) => {
+                setEditingAlert(null);
+                setAlertDrawingId(drawingId);
+                setAlertDialog(true);
+              }}
             />
           )}
         </div>
@@ -280,9 +289,11 @@ export function ChartView({ instrumentKey, symbol, name }: Props) {
           currentPrice={last?.close}
           drawings={drawings}
           editing={editingAlert}
+          initialDrawingId={alertDrawingId}
           onClose={() => {
             setAlertDialog(false);
             setEditingAlert(null);
+            setAlertDrawingId(null);
           }}
           onSaved={(rule) =>
             setAlerts((list) => {

@@ -1,6 +1,7 @@
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import Watchlists from "./pages/Watchlists";
+import Alerts from "./pages/Alerts";
 import Holdings from "./pages/Holdings";
 import Diversification from "./pages/Diversification";
 import ChartPage from "./pages/ChartPage";
@@ -13,6 +14,7 @@ function Shell() {
         <h1>Portfolio Tracker</h1>
         <NavLink to="/dashboard" className="nav-link">Dashboard</NavLink>
         <NavLink to="/watchlists" className="nav-link">Watchlists</NavLink>
+        <NavLink to="/alerts" className="nav-link">Alerts</NavLink>
         <NavLink to="/holdings" className="nav-link">Holdings</NavLink>
         <NavLink to="/diversification" className="nav-link">Diversification</NavLink>
       </nav>
@@ -21,6 +23,7 @@ function Shell() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/watchlists" element={<Watchlists />} />
+          <Route path="/alerts" element={<Alerts />} />
           <Route path="/holdings" element={<Holdings />} />
           <Route path="/diversification" element={<Diversification />} />
         </Routes>
