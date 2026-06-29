@@ -1,4 +1,7 @@
 import type {
+  AlertNotification,
+  AlertRule,
+  AlertRuleInput,
   CandlesResponse,
   ChartDrawing,
   ChartDrawingsResponse,
@@ -93,4 +96,25 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ drawings }),
     }),
+
+  // alerts (TradingView-style price/indicator/drawing alerts)
+  listAlerts: (instrumentKey?: string) =>
+    req<AlertRule[]>(
+      `/alerts${instrumentKey ? `?instrument_key=${encodeURIComponent(instrumentKey)}` : ""}`,
+    ),
+  createAlert: (payload: AlertRuleInput) =>
+    req<AlertRule>("/alerts", { method: "POST", body: JSON.stringify(payload) }),
+  updateAlert: (id: number, payload: Partial<AlertRuleInput> & { is_active?: boolean }) =>
+    req<AlertRule>(`/alerts/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  deleteAlert: (id: number) => req<void>(`/alerts/${id}`, { method: "DELETE" }),
+  testAlert: (id: number) =>
+    req<AlertNotification>(`/alerts/${id}/test`, { method: "POST" }),
+
+  // alert notifications (polled by the browser for push/toast)
+  listNotifications: (unreadOnly = false) =>
+    req<AlertNotification[]>(`/alerts/notifications${unreadOnly ? "?unread_only=true" : ""}`),
+  markNotificationRead: (id: number) =>
+    req<AlertNotification>(`/alerts/notifications/${id}/read`, { method: "POST" }),
+  markAllNotificationsRead: () =>
+    req<void>("/alerts/notifications/read-all", { method: "POST" }),
 };

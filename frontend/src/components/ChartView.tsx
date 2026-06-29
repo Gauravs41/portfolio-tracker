@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
-import type { Candle, ChartDrawing, RsiInterval } from "../types";
+import type { AlertRule, Candle, ChartDrawing, RsiInterval } from "../types";
 import {
   DEFAULT_INDICATORS,
   StockChart,
@@ -8,6 +8,8 @@ import {
 } from "./StockChart";
 import { DrawingToolbar } from "./DrawingToolbar";
 import type { Tool } from "./DrawingOverlay";
+import { AlertDialog } from "./AlertDialog";
+import { AlertsPanel } from "./AlertsPanel";
 
 const INTERVALS: { value: RsiInterval; label: string }[] = [
   { value: "day", label: "1D" },
@@ -57,6 +59,12 @@ export function ChartView({ instrumentKey, symbol, name }: Props) {
   const [drawings, setDrawings] = useState<ChartDrawing[]>([]);
   const skipSaveRef = useRef(true);
 
+  // Alerts for this instrument.
+  const [alerts, setAlerts] = useState<AlertRule[]>([]);
+  const [showAlerts, setShowAlerts] = useState(false);
+  const [alertDialog, setAlertDialog] = useState(false);
+  const [editingAlert, setEditingAlert] = useState<AlertRule | null>(null);
+
   useEffect(() => {
     let alive = true;
     setLoading(true);
@@ -95,6 +103,18 @@ export function ChartView({ instrumentKey, symbol, name }: Props) {
     }, 600);
     return () => window.clearTimeout(t);
   }, [drawings, instrumentKey]);
+
+  // Load alerts for the instrument.
+  useEffect(() => {
+    let alive = true;
+    api
+      .listAlerts(instrumentKey)
+      .then((r) => alive && setAlerts(r))
+      .catch(() => alive && setAlerts([]));
+    return () => {
+      alive = false;
+    };
+  }, [instrumentKey]);
 
   useEffect(() => {
     localStorage.setItem(STORE_KEY, JSON.stringify(indicators));
@@ -169,6 +189,25 @@ export function ChartView({ instrumentKey, symbol, name }: Props) {
             onChange={(e) => setColor(e.target.value)}
           />
 
+          <button
+            className={`ghost alert-bell ${alerts.some((a) => a.is_active) ? "has-alerts" : ""}`}
+            title="Create alert"
+            onClick={() => {
+              setEditingAlert(null);
+              setAlertDialog(true);
+            }}
+          >
+            🔔{alerts.length > 0 && <span className="alert-count">{alerts.length}</span>}
+          </button>
+
+          <button
+            className={`ghost ${showAlerts ? "active" : ""}`}
+            title="Manage alerts"
+            onClick={() => setShowAlerts((o) => !o)}
+          >
+            Alerts ▾
+          </button>
+
           <div className="col-menu-wrap" ref={menuRef}>
             <button className="ghost" onClick={() => setMenuOpen((o) => !o)}>
               Indicators ▾
@@ -216,10 +255,46 @@ export function ChartView({ instrumentKey, symbol, name }: Props) {
               drawings={drawings}
               onDrawingsChange={setDrawings}
               onToolDone={() => setTool("cursor")}
+              alerts={alerts}
             />
           )}
         </div>
+        {showAlerts && (
+          <AlertsPanel
+            alerts={alerts}
+            onChange={setAlerts}
+            onEdit={(rule) => {
+              setEditingAlert(rule);
+              setAlertDialog(true);
+            }}
+            onClose={() => setShowAlerts(false)}
+          />
+        )}
       </div>
+
+      {alertDialog && (
+        <AlertDialog
+          instrumentKey={instrumentKey}
+          symbol={symbol}
+          name={name}
+          currentPrice={last?.close}
+          drawings={drawings}
+          editing={editingAlert}
+          onClose={() => {
+            setAlertDialog(false);
+            setEditingAlert(null);
+          }}
+          onSaved={(rule) =>
+            setAlerts((list) => {
+              const i = list.findIndex((a) => a.id === rule.id);
+              if (i === -1) return [rule, ...list];
+              const copy = [...list];
+              copy[i] = rule;
+              return copy;
+            })
+          }
+        />
+      )}
     </div>
   );
 }

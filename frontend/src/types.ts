@@ -166,3 +166,59 @@ export interface ChartDrawingsResponse {
   instrument_key: string;
   drawings: ChartDrawing[];
 }
+
+// ---- Alerts ----
+export type AlertCondition =
+  | "price_cross_up"
+  | "price_cross_down"
+  | "price_above"
+  | "price_below"
+  | "pct_change_above"
+  | "pct_change_below"
+  | "rsi_above"
+  | "rsi_below"
+  | "price_cross_sma"
+  | "drawing_cross";
+
+export type AlertFrequency = "once" | "once_per_bar" | "always";
+
+export interface AlertRule {
+  id: number;
+  instrument_key: string;
+  symbol: string;
+  name: string;
+  condition: AlertCondition;
+  value: number;
+  params: Record<string, unknown>;
+  drawing_id: string | null;
+  frequency: AlertFrequency;
+  message: string;
+  is_active: boolean;
+  last_value: number | null;
+  last_triggered_at: string | null;
+  trigger_count: number;
+  created_at: string;
+}
+
+export interface AlertRuleInput {
+  instrument_key: string;
+  symbol?: string;
+  name?: string;
+  condition: AlertCondition;
+  value?: number;
+  params?: Record<string, unknown>;
+  drawing_id?: string | null;
+  frequency?: AlertFrequency;
+  message?: string;
+}
+
+export interface AlertNotification {
+  id: number;
+  alert_id: number | null;
+  instrument_key: string;
+  symbol: string;
+  title: string;
+  body: string;
+  is_read: boolean;
+  created_at: string;
+}

@@ -4,6 +4,7 @@ import Watchlists from "./pages/Watchlists";
 import Holdings from "./pages/Holdings";
 import Diversification from "./pages/Diversification";
 import ChartPage from "./pages/ChartPage";
+import { AlertNotifier } from "./components/AlertNotifier";
 
 function Shell() {
   return (
@@ -30,10 +31,13 @@ function Shell() {
 
 export default function App() {
   return (
-    <Routes>
-      {/* Full-bleed chart route (opened in a new tab) — no sidebar. */}
-      <Route path="/chart/:instrumentKey" element={<ChartPage />} />
-      <Route path="/*" element={<Shell />} />
-    </Routes>
+    <>
+      <AlertNotifier />
+      <Routes>
+        {/* Full-bleed chart route (opened in a new tab) — no sidebar. */}
+        <Route path="/chart/:instrumentKey" element={<ChartPage />} />
+        <Route path="/*" element={<Shell />} />
+      </Routes>
+    </>
   );
 }

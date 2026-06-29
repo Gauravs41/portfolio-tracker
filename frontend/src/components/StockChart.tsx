@@ -18,7 +18,7 @@ import {
 import type { Candle } from "../types";
 import { bollinger, ema, rsi, sma, type LinePoint } from "../lib/indicators";
 import { DrawingOverlay, type Tool } from "./DrawingOverlay";
-import type { ChartDrawing } from "../types";
+import type { AlertRule, ChartDrawing } from "../types";
 
 const UP = "#26a69a";
 const DOWN = "#ef5350";
@@ -55,7 +55,16 @@ interface Props {
   drawings?: ChartDrawing[];
   onDrawingsChange?: (drawings: ChartDrawing[]) => void;
   onToolDone?: () => void;
+  alerts?: AlertRule[];
 }
+
+// Price-level conditions whose threshold maps to a horizontal line on the chart.
+const PRICE_LEVEL_CONDITIONS = new Set([
+  "price_cross_up",
+  "price_cross_down",
+  "price_above",
+  "price_below",
+]);
 
 const toLine = (pts: LinePoint[]): LineData<Time>[] =>
   pts.map((p) => ({ time: p.time as Time, value: p.value }));
@@ -70,6 +79,7 @@ export function StockChart({
   drawings = [],
   onDrawingsChange,
   onToolDone,
+  alerts = [],
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -84,6 +94,7 @@ export function StockChart({
   const bbLowRef = useRef<ISeriesApi<"Line"> | null>(null);
   const rsiRef = useRef<ISeriesApi<"Line"> | null>(null);
   const rsiLinesRef = useRef<IPriceLine[]>([]);
+  const alertLinesRef = useRef<IPriceLine[]>([]);
 
   // Build the chart + all series once.
   useEffect(() => {
@@ -248,6 +259,27 @@ export function StockChart({
     rsiRef.current?.applyOptions({ visible: indicators.rsi });
     chartRef.current?.panes()[1]?.setHeight(indicators.rsi ? 120 : 1);
   }, [indicators]);
+
+  // Draw a dashed horizontal line for each price-level alert (TradingView-style).
+  useEffect(() => {
+    const series = priceRef.current;
+    if (!ready || !series) return;
+    for (const pl of alertLinesRef.current) series.removePriceLine(pl);
+    alertLinesRef.current = alerts
+      .filter((a) => a.is_active && PRICE_LEVEL_CONDITIONS.has(a.condition) && a.value > 0)
+      .map((a) => {
+        const down =
+          a.condition === "price_below" || a.condition === "price_cross_down";
+        return series.createPriceLine({
+          price: a.value,
+          color: down ? DOWN : UP,
+          lineWidth: 1,
+          lineStyle: LineStyle.Dashed,
+          axisLabelVisible: true,
+          title: `⏰ ${a.value}`,
+        });
+      });
+  }, [alerts, ready]);
 
   return (
     <div

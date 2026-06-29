@@ -6,7 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.db import Base, engine
+from app.migrations import run_migrations
 from app.routers import (
+    alerts,
     candles,
     chart_drawings,
     diversification,
@@ -16,6 +18,7 @@ from app.routers import (
     performance,
     watchlists,
 )
+from app.services import scheduler
 
 settings = get_settings()
 
@@ -24,7 +27,14 @@ settings = get_settings()
 async def lifespan(_: FastAPI):
     # Create tables if they don't exist (safe to run alongside schema.sql).
     Base.metadata.create_all(bind=engine)
-    yield
+    # Additively bring older alert/notification tables up to the current schema.
+    run_migrations(engine)
+    # Start the background alert evaluator.
+    scheduler.start()
+    try:
+        yield
+    finally:
+        scheduler.shutdown()
 
 
 app = FastAPI(title="Portfolio Tracker API", version="0.1.0", lifespan=lifespan)
@@ -45,6 +55,7 @@ app.include_router(performance.router)
 app.include_router(candles.router)
 app.include_router(chart_drawings.router)
 app.include_router(diversification.router)
+app.include_router(alerts.router)
 
 
 @app.get("/health", tags=["meta"])

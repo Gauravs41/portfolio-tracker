@@ -1,7 +1,7 @@
 """Pydantic request/response schemas."""
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # ---- Instruments ----
@@ -187,3 +187,88 @@ class DiversificationResponse(BaseModel):
     total_market_value: float = 0
     by_sector: list[DiversificationSlice] = []
     by_board: list[DiversificationSlice] = []
+
+
+# ---- Alerts ----
+# Conditions accepted by the alert engine (kept in sync with services/alerts.py).
+ALERT_CONDITIONS = {
+    "price_cross_up",
+    "price_cross_down",
+    "price_above",
+    "price_below",
+    "pct_change_above",
+    "pct_change_below",
+    "rsi_above",
+    "rsi_below",
+    "price_cross_sma",
+    "drawing_cross",
+}
+ALERT_FREQUENCIES = {"once", "once_per_bar", "always"}
+
+
+class AlertRuleCreate(BaseModel):
+    instrument_key: str
+    symbol: str = ""
+    name: str = ""
+    condition: str = "price_cross_up"
+    value: float = 0.0
+    params: dict = {}
+    drawing_id: str | None = None
+    frequency: str = "once"
+    message: str = ""
+
+    @field_validator("condition")
+    @classmethod
+    def _check_condition(cls, v: str) -> str:
+        if v not in ALERT_CONDITIONS:
+            raise ValueError(f"invalid condition: {v}")
+        return v
+
+    @field_validator("frequency")
+    @classmethod
+    def _check_frequency(cls, v: str) -> str:
+        if v not in ALERT_FREQUENCIES:
+            raise ValueError(f"invalid frequency: {v}")
+        return v
+
+
+class AlertRuleUpdate(BaseModel):
+    name: str | None = None
+    condition: str | None = None
+    value: float | None = None
+    params: dict | None = None
+    drawing_id: str | None = None
+    frequency: str | None = None
+    message: str | None = None
+    is_active: bool | None = None
+
+
+class AlertRuleOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    instrument_key: str
+    symbol: str = ""
+    name: str = ""
+    condition: str
+    value: float
+    params: dict = {}
+    drawing_id: str | None = None
+    frequency: str
+    message: str = ""
+    is_active: bool
+    last_value: float | None = None
+    last_triggered_at: datetime | None = None
+    trigger_count: int = 0
+    created_at: datetime
+
+
+class NotificationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    alert_id: int | None = None
+    instrument_key: str = ""
+    symbol: str = ""
+    title: str = ""
+    body: str = ""
+    is_read: bool = False
+    created_at: datetime

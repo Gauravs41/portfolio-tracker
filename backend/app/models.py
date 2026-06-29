@@ -127,6 +127,9 @@ class Notification(Base):
     __tablename__ = "notifications"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    alert_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    instrument_key: Mapped[str] = mapped_column(String(64), default="", index=True)
+    symbol: Mapped[str] = mapped_column(String(64), default="")
     title: Mapped[str] = mapped_column(String(255), default="")
     body: Mapped[str] = mapped_column(Text, default="")
     is_read: Mapped[bool] = mapped_column(default=False)
@@ -134,11 +137,38 @@ class Notification(Base):
 
 
 class AlertRule(Base):
+    """A TradingView-style alert rule evaluated by the background scheduler.
+
+    ``condition`` drives which input value is observed and how it's compared:
+      price_cross_up / price_cross_down — last price crosses ``value``
+      price_above / price_below        — last price is beyond ``value``
+      pct_change_above / pct_change_below — daily % change vs ``value``
+      rsi_above / rsi_below            — RSI(14) on ``params.interval`` vs ``value``
+      price_cross_sma                  — price crosses its SMA(``params.period``)
+      drawing_cross                    — price crosses a drawn line (``drawing_id``)
+
+    ``frequency`` mirrors TradingView: once | once_per_bar | always.
+    ``last_value`` stores the previously-observed input so "cross" conditions
+    only fire on the transition, not on every poll while past the level.
+    """
+
     __tablename__ = "alert_rules"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     instrument_key: Mapped[str] = mapped_column(String(64), index=True)
-    condition: Mapped[str] = mapped_column(String(32), default="price_above")  # price_above|price_below|pct_change
-    threshold: Mapped[float] = mapped_column(Float, default=0.0)
+    symbol: Mapped[str] = mapped_column(String(64), default="")
+    name: Mapped[str] = mapped_column(String(255), default="")
+    condition: Mapped[str] = mapped_column(String(32), default="price_cross_up")
+    value: Mapped[float] = mapped_column(Float, default=0.0)
+    # Extra condition inputs (e.g. {"interval": "day", "period": 14}).
+    params: Mapped[dict] = mapped_column(JSON, default=dict)
+    drawing_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    frequency: Mapped[str] = mapped_column(String(16), default="once")  # once|once_per_bar|always
+    message: Mapped[str] = mapped_column(Text, default="")
     is_active: Mapped[bool] = mapped_column(default=True)
+    # Runtime state maintained by the scheduler.
+    last_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    last_bar_time: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    trigger_count: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
